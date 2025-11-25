@@ -1,0 +1,62 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+ 
+}
+
+// =============================
+// MODELOS BÁSICOS KOLBEN
+// =============================
+
+// Clientes que ves en el admin (luego los usaremos para login)
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  codigo    String   @unique // código interno, si quieres
+  usuario   String?  @unique
+  clave     String?  // por ahora en texto plano, luego la encriptamos
+
+  pedidos   Pedido[]
+  creadoEn  DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+}
+
+// Pedido que se crea desde el carrito del admin
+model Pedido {
+  id           Int          @id @default(autoincrement())
+  clienteId    Int
+  cliente      Cliente      @relation(fields: [clienteId], references: [id])
+
+  estado       String       // "PENDIENTE" | "PREPARANDO" | "ENVIADO"
+  creadoEn     DateTime     @default(now())
+  actualizadoEn DateTime    @updatedAt
+
+  items        PedidoItem[]
+}
+
+// Ítems que vienen del carrito (cada fila)
+model PedidoItem {
+  id          Int     @id @default(autoincrement())
+  pedidoId    Int
+  pedido      Pedido  @relation(fields: [pedidoId], references: [id])
+
+  codigo      String
+  descripcion String
+
+  // Cantidades por sucursal
+  sucursalA   Int     @default(0)
+  sucursalB   Int     @default(0)
+  sucursalC   Int     @default(0)
+
+  // Tipo de renglón en tu UI ("normal" | "reserva" etc.)
+  tipo        String   @default("normal")
+
+  // Estado del producto en catálogo (Disponible, Bajo stock, Llegando, etc.)
+  estadoProd  String? 
+  eta         String? 
+}

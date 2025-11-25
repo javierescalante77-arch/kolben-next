@@ -1,26 +1,349 @@
-@import "tailwindcss";
-
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* ============================================================
+   RESETEO BÁSICO
+   ============================================================ */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+html,
+body {
+  width: 100%;
+  height: 100%;
+  background: #fafafa;
+  font-family: var(
+    --font-base,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    "Open Sans",
+    "Helvetica Neue",
+    sans-serif
+  );
+  color: #111;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Contenedor general */
+.container {
+  width: 100%;
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.panel {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ============================================================
+   LANDING PAGE
+   ============================================================ */
+
+.landing-root {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+.landing-header {
+  background: #fff;
+  padding: 18px 0;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.landing-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.landing-logo {
+  height: 64px;
+}
+
+.landing-title-block {
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.landing-subtitle {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.landing-main {
+  flex: 1;
+  padding: 24px 0;
+}
+
+.landing-card {
+  width: 100%;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+.landing-section-title {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.landing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+@media (max-width: 768px) {
+  .landing-grid {
+    grid-template-columns: 1fr;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+.landing-box {
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px;
+  border: 1px solid #e5e7eb;
 }
+
+.landing-box h3 {
+  margin-bottom: 8px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.landing-box p {
+  color: #444;
+  margin-bottom: 12px;
+}
+
+.landing-list {
+  list-style: none;
+  padding-left: 0;
+  margin-bottom: 16px;
+}
+
+.landing-list li {
+  display: flex;
+  align-items: start;
+  gap: 6px;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 6px;
+}
+
+.bullet {
+  color: #fca311;
+  font-weight: bold;
+}
+
+.landing-actions {
+  margin-top: 10px;
+}
+
+.landing-btn {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 8px;
+  text-decoration: none !important;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.landing-btn.primary {
+  background: #14213d;
+  color: #fff;
+}
+
+.landing-btn.secondary {
+  background: #fca311;
+  color: #111;
+}
+
+.landing-btn:hover {
+  opacity: 0.9;
+}
+
+.landing-note {
+  margin-top: 36px;
+  width: 100%;
+  max-width: 960px;
+  padding: 0 16px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.landing-note h2 {
+  margin-bottom: 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.landing-note p {
+  margin-bottom: 6px;
+}
+
+.landing-footer {
+  background: #fff;
+  padding: 16px;
+  border-top: 1px solid #e5e7eb;
+  text-align: center;
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* ============================================================
+   BOTONES / INPUTS (GENÉRICOS)
+   ============================================================ */
+.btn,
+button,
+input[type="button"],
+input[type="submit"] {
+  cursor: pointer;
+}
+
+/* Chip de usuario arriba */
+.badge-user {
+  background: #14213d;
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 14px;
+}
+
+/* ============================================================
+   TAB BAR (ADMIN)
+   ============================================================ */
+
+#tabs {
+  display: flex;
+  gap: 12px;
+}
+
+.tab {
+  padding: 8px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  background: transparent;
+  color: #111;
+  text-decoration: none;
+  border: 1px solid transparent;
+}
+
+.tab.active {
+  background: #fca31122;
+  border-color: #fca31155;
+}
+
+/* ============================================================
+   GRID DE PRODUCTOS (ADMIN / CLIENTE)
+   ============================================================ */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+@media (max-width: 940px) {
+  .grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ========================
+      TOPBAR
+========================= */
+
+#topbar {
+  width: 100%;
+  background: var(--white);
+  padding: 16px 20px 12px;
+  border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.topbar-inner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.logo-box {
+  display: flex;
+  align-items: center;
+}
+
+.logo-img {
+  height: 38px;     /* más pequeño como EONIK */
+  width: auto;
+}
+
+.top-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-ghost.small {
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 20px;
+}
+
+/* ========================
+         TABS
+========================= */
+
+#tabs {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 14px;            /* menos aire */
+  border-bottom: 1px solid rgba(0,0,0,0.10);
+  padding-bottom: 4px;
+}
+
+#tabs .tab {
+  padding: 10px 12px;
+  font-size: 15px;
+  color: #555;
+  border-radius: 14px;
+  transition: 0.25s;
+}
+
+#tabs .tab.active {
+  background: var(--orange);
+  color: var(--white);
+  font-weight: 600;
+}
+
+/* ============================================================
+   FIN DE ARCHIVO
+   ============================================================ */

@@ -1,65 +1,138 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import Link from "next/link";
+import "./globals.css";
+
+/**
+ * Página de inicio / landing muy simple para ambiente de desarrollo.
+ * Desde aquí puedes entrar como:
+ *  - Administrador → /admin/catalogo
+ *  - Cliente demo → /cliente/catalogo
+ *
+ * En producción, esta pantalla se sustituirá por el login real.
+ */
+export default function HomePage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="landing-root">
+      <header className="landing-header">
+        <div className="landing-logo-wrap">
+          <img
+            src="/kolben-logo.png"
+            alt="Kolben Auto Repuestos"
+            className="landing-logo"
+          />
+          <div className="landing-title-block">
+            <h1 className="landing-title">KOLBEN · Panel de pedidos</h1>
+            <p className="landing-subtitle">
+              Versión Next · Entorno de desarrollo
+            </p>
+          </div>
+        </div>
+      </header>
+
+      <main className="landing-main">
+        <section className="landing-card">
+          <h2 className="landing-section-title">Accesos rápidos</h2>
+
+          <div className="landing-grid">
+            {/* Bloque ADMIN */}
+            <div className="landing-box">
+              <h3>Administrador</h3>
+              <p>
+                Entra al entorno de administrador para gestionar catálogo,
+                pedidos, productos y clientes.
+              </p>
+              <ul className="landing-list">
+                <li>
+                  <span className="bullet">•</span> Catálogo admin: ver
+                  productos y probar favoritos
+                </li>
+                <li>
+                  <span className="bullet">•</span> Carrito admin: vista espejo
+                  para pruebas de flujo
+                </li>
+                <li>
+                  <span className="bullet">•</span> Pedidos admin: revisar
+                  tarjetas, estados y detalle
+                </li>
+                <li>
+                  <span className="bullet">•</span> Productos: mantenimiento de
+                  catálogo
+                </li>
+                <li>
+                  <span className="bullet">•</span> Clientes: alias, sucursales
+                  activas, etc.
+                </li>
+              </ul>
+
+              <div className="landing-actions">
+                <Link href="/admin/catalogo" className="landing-btn primary">
+                  Entrar como Admin
+                </Link>
+              </div>
+            </div>
+
+            {/* Bloque CLIENTE */}
+            <div className="landing-box">
+              <h3>Cliente (demo)</h3>
+              <p>
+                Simula la experiencia del cliente final: catálogo, carrito y
+                pedidos.
+              </p>
+              <ul className="landing-list">
+                <li>
+                  <span className="bullet">•</span> Catálogo cliente: 2
+                  productos por fila, chips, favoritos
+                </li>
+                <li>
+                  <span className="bullet">•</span> Carrito cliente: cantidades
+                  por sucursal
+                </li>
+                <li>
+                  <span className="bullet">•</span> Pedidos cliente: historial
+                  básico
+                </li>
+              </ul>
+
+              <div className="landing-actions">
+                <Link
+                  href="/cliente/catalogo"
+                  className="landing-btn secondary"
+                >
+                  Entrar como Cliente demo
+                </Link>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Nota de desarrollo */}
+        <section className="landing-note">
+          <h2>Notas de desarrollo</h2>
+          <p>
+            Esta pantalla es solo de apoyo mientras terminamos de migrar el
+            diseño EONIK al stack Next/React/Prisma. En producción:
           </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+          <ul className="landing-list">
+            <li>
+              <span className="bullet">•</span> <strong>/</strong> será la
+              página de login real.
+            </li>
+            <li>
+              <span className="bullet">•</span> Se aplicará autenticación
+              (NextAuth/Auth.js) con roles Admin / Cliente.
+            </li>
+            <li>
+              <span className="bullet">•</span> Los accesos se mostrarán según
+              el rol del usuario.
+            </li>
+          </ul>
+        </section>
       </main>
+
+      <footer className="landing-footer">
+        <span>Kolben Auto Repuestos · entorno de pruebas</span>
+      </footer>
     </div>
   );
 }

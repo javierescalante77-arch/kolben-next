@@ -1,0 +1,134 @@
+/* ====== Shell ====== */
+:root {
+  --card: #ffffff;
+  --line: #e5e7eb;
+  --yam: #f59e0b;
+}
+
+.container {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 16px;
+  overflow-x: hidden;
+}
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 0;
+  flex-wrap: nowrap;
+}
+
+.brand-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  background: transparent !important;
+  border: none !important;
+  padding: 0;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.brand-img {
+  height: 60px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.brand-text {
+  font-weight: 800;
+  font-size: 28px;
+  color: var(--yam);
+  letter-spacing: .5px;
+}
+
+#logoEditWrap {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+#logoEditBtn {
+  border: 1px solid var(--line);
+  background: #fff;
+  color: #111827;
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+nav#tabs {
+  display: flex;
+  gap: 10px;
+  margin-left: 12px;
+}
+
+nav#tabs .tab {
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: #eef2f7;
+  color: #111827;
+  cursor: pointer;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+nav#tabs .tab.active {
+  background: var(--yam);
+  color: #fff;
+}
+
+/* Botones */
+button,
+.btn {
+  border: none;
+  cursor: pointer;
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-weight: 800;
+  transition: transform .08s ease;
+}
+
+.btn.primary {
+  background: #14213d;
+  color: #fff;
+}
+
+.btn.light {
+  background: #fff;
+  border: 1px solid var(--line);
+  color: #111827;
+}
+
+/* Panel */
+.panel {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.1);
+}
+
+/* =========================================================
+   KOLBEN – Unificar chips en móvil (admin)
+========================================================= */
+@media (max-width: 767px){
+  @import "../styles/chips.mobile.css";
+}

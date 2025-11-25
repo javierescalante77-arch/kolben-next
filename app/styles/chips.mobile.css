@@ -1,0 +1,42 @@
+/* =========================================================
+   KOLBEN – CHIPS MÓVILES UNIFICADAS (≤767px)
+   Se importa desde admin.css y cliente.css dentro de @media
+========================================================= */
+
+/* Base de las píldoras de disponibilidad / estado */
+.pill{
+  display:inline-block;
+  padding:8px 14px;
+  border-radius:999px;
+  font-weight:800;
+  font-size:12px;
+  white-space:nowrap;
+  background:#fff;
+  border:1px solid transparent;
+}
+
+/* Estados (mismos colores que catálogo) */
+.pill.ok{
+  color:var(--ok-deep);
+  border-color:rgba(34,197,94,.45);
+}
+.pill.low{
+  color:var(--low-deep);
+  border-color:rgba(245,158,11,.45);
+}
+.pill.bad{
+  color:var(--bad-deep);
+  border-color:rgba(239,68,68,.45);
+}
+.pill.res{
+  color:var(--res-deep);
+  border-color:rgba(14,165,233,.45);
+}
+
+/* Chips dentro de filas de estado en listas (carrito/pedidos) */
+.order-chip-row .pill,
+.cart-card-estado .pill{
+  max-width:100%;
+  white-space:normal;   /* permite salto de línea en “Llegando · 25 enero” */
+  text-align:center;
+}

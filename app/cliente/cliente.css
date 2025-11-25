@@ -1,0 +1,1494 @@
+:root{
+  /* Paleta base Kolben */
+  --yam:#EA9216;
+  --ink:#1f2937;
+  --ink-2:#374151;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+  --bg:#FAF9F6;
+  --card:#ffffff;
+  --ring:rgba(234,146,22,.25);
+
+  --ok:#22c55e;
+  --ok-deep:#166534;
+  --low:#f59e0b;
+  --low-deep:#92400e;
+  --bad:#ef4444;
+  --bad-deep:#991b1b;
+  --res:#0ea5e9;
+  --res-deep:#075985; /* Reservar (en camino) */
+}
+
+/* ====== Reset suave específico de la app cliente/admin ====== */
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--ink);
+  font-family:var(
+    --font-base,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Helvetica,
+    Arial,
+    "Apple Color Emoji",
+    "Segoe UI Emoji"
+  );
+}
+
+/* =========================================================
+   SHELL / LAYOUT GENERAL
+========================================================= */
+
+.container{
+  max-width:1180px;   /* antes: 1180px */
+  margin:0 auto;
+  padding:16px 40px;
+  overflow-x:hidden;
+}
+
+/* Header pegado arriba (admin y cliente comparten esto) */
+header{
+  position:sticky;
+  top:0;
+  z-index:20;
+  background:var(--card);
+  /* antes tenía: border-bottom:1px solid var(--line); */
+  border-bottom:none; /* sin línea gris bajo las pestañas */
+}
+
+
+/* Barra superior: logo + tabs + sesión */
+.topbar{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:14px 0;
+  flex-wrap:nowrap;
+}
+
+/* Logo + botón editar logo */
+.brand-wrap{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.brand-btn{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  cursor:pointer;
+  border:none !important;
+  background:transparent !important;
+  padding:0 !important;
+  box-shadow:none !important;
+  outline:0 !important;
+}
+.brand-img{
+  height:60px;
+  max-width:100%;
+  object-fit:contain;
+}
+
+/* Botón editar logo */
+#logoEditWrap{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+#logoEditBtn{
+  border-radius:999px;
+  border:1px solid var(--line);
+  padding:8px 16px;
+  background:#f9fafb;
+  color:#111827;
+  font-size:13px;
+  cursor:pointer;
+}
+#logoEditBtn:hover{
+  border-color:var(--yam);
+  background:#fff7ec;
+}
+
+/* Caja de usuario / alias / salir (lado derecho) */
+.right{
+  margin-left:auto;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.badge-user{
+  background:#14213D;
+  color:#fff;
+  padding:6px 12px;
+  border-radius:999px;
+  font-size:13px;
+  white-space:nowrap;
+}
+
+/* Tabs superiores (Catálogo / Carrito / Pedidos / etc.) */
+#tabs{
+  margin-left:16px;
+  display:flex;
+  align-items:center;
+  gap:8px;
+}
+
+/* En admin se usan <a>, en cliente normalmente <button> */
+.tab{
+  border-radius:9999px;
+  border:none;
+  padding:8px 18px;
+  font-size:14px;
+  background:#f3f4f6;
+  color:#4b5563;
+  cursor:pointer;
+  text-decoration:none;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  white-space:nowrap;
+  transition:.15s ease;
+}
+.tab:hover{background:#e5e7eb}
+.tab.active{
+  background:#111827;
+  color:#f9fafb;
+}
+
+/* ====== HEADER / TABS en MÓVIL (≤ 767px) ====== */
+@media (max-width:767px){
+
+  /* Recortamos un poco el padding general para acercar chips al header */
+  .container{
+    max-width:1180px;
+    margin:0 auto;
+    padding:8px 12px 14px;
+    overflow-x:hidden;
+  }
+
+  main{
+    padding-top:2px;
+  }
+
+  /* Topbar en dos filas:
+     1) logo + Admin + Salir
+     2) tabs */
+  .topbar{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    column-gap:8px;
+    row-gap:8px;
+    padding:10px 10;
+  }
+
+  /* Logo + botón editar */
+  .brand-wrap{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex:0 0 auto;
+  }
+
+  .brand-img{
+    height:55px;          /* logo más compacto en móvil */
+  }
+
+  #logoEditBtn{
+    padding:4px 10px;
+    font-size:12px;
+  }
+
+  /* Admin + Salir pegados a la derecha en la misma fila */
+  .right{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:6px;
+    flex:0 0 auto;
+  }
+
+  /* CHIP ADMIN: más protagonista (relleno) */
+  .badge-user{
+    padding:5px 10px;
+    font-size:12px;
+    border-radius:999px;
+    background:#111827;
+    color:#f9fafb;
+    border:1px solid #d1d5db;  /* contorno suave gris */
+    white-space:nowrap;
+  }
+
+  /* BOTÓN SALIR: solo contorno, sin fondo, estilo chip/estatus */
+  .btn-ghost{
+    padding:5px 10px;
+    font-size:12px;
+    border-radius:999px;
+    border:1px solid var(--yam);
+    background:transparent;
+    color:var(--yam);
+    cursor:pointer;
+  }
+  .btn-ghost:hover{
+    background:rgba(234,146,22,.06);
+  }
+
+  /* Tabs en segunda fila, ancho completo, scroll horizontal suave */
+  #tabs{
+    width:100%;
+    margin-left:0;
+    margin-top:6px;          /* espacio pequeño antes de la chip “Todo” */
+    overflow-x:auto;
+    scrollbar-width:none;
+  }
+  #tabs::-webkit-scrollbar{
+    display:none;
+  }
+
+  /* TABS: estilo chip “Todo” (contorno, sin fondo) */
+  .tab{
+    flex:0 0 auto;
+    border-radius:9999px;
+    border:1px solid var(--line);
+    padding:5px 12px;
+    font-size:13px;
+    background:var(--card);
+    color:#4b5563;
+    text-decoration:none;
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    white-space:nowrap;
+  }
+
+  .tab:hover{
+    border-color:var(--yam);
+    background:rgba(234,146,22,.06);
+  }
+
+  .tab.active{
+    border-color:var(--yam);
+    background:rgba(234,146,22,.12);
+    color:var(--yam);
+  }
+
+  /* Chips de filtro debajo ya con gap compacto */
+  .chips{
+    gap:6px;
+    padding:4px 0 8px;
+  }
+  .chip{
+    padding:5px 12px;
+    font-size:13px;
+  }
+}
+
+
+/* =========================================================
+   CHIPS DE FILTRO (CATÁLOGO)
+========================================================= */
+
+.chips{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  padding:4px 0 10px;
+  overflow-x:auto;
+  scrollbar-width:none;
+}
+.chips::-webkit-scrollbar{display:none}
+
+.chip{
+  flex:0 0 auto;
+  border-radius:9999px;
+  padding:6px 14px;
+  font-size:14px;
+  line-height:1.2;
+  border:1px solid var(--line);
+  background:var(--card);
+  color:#4b5563;
+  cursor:pointer;
+  white-space:nowrap;
+  transition:
+    background-color .15s ease,
+    color .15s ease,
+    border-color .15s ease,
+    transform .08s ease;
+}
+.chip:hover{
+  border-color:var(--yam);
+  background:rgba(252,163,17,.06);
+  transform:translateY(-1px);
+}
+.chip.active{
+  border-color:var(--yam);
+  background:rgba(252,163,17,.12);
+  color:var(--yam);
+}
+
+@media (max-width:767px){
+  .chips{
+    gap:6px;
+    padding:4px 0 8px;
+  }
+  .chip{
+    padding:5px 12px;
+    font-size:13px;
+  }
+}
+
+/* =========================================================
+   FILA BUSCADOR
+========================================================= */
+
+.row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-top:8px;
+  margin-bottom:8px;
+}
+.row input[type="text"],
+.row input[type="search"],
+.row input#q{
+  flex:1;
+  border-radius:999px;
+  border:1px solid var(--line);
+  padding:9px 14px;
+  font-size:14px;
+  outline:0;
+}
+.row input::placeholder{color:#9ca3af}
+.row input:focus{
+  border-color:var(--yam);
+  box-shadow:0 0 0 1px rgba(234,146,22,.18);
+}
+
+.btn{
+  border-radius:999px;
+  border:none;
+  padding:9px 16px;
+  font-size:14px;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:6px;
+}
+.btn.light{
+  background:#f3f4f6;
+  color:#111827;
+  border:1px solid #e5e7eb;
+}
+.btn.light:hover{background:#e5e7eb}
+.btn.primary{
+  background:#111827;
+  color:#f9fafb;
+}
+.btn.primary:hover{background:#020617}
+
+/* =========================================================
+   TOAST “AGREGADO”
+========================================================= */
+
+.toast{
+  position:fixed;
+  left:50%;
+  top:16px;
+  transform:translateX(-50%) translateY(-20px);
+  opacity:0;
+  pointer-events:none;
+  background:#111827;
+  color:#f9fafb;
+  padding:6px 14px;
+  border-radius:999px;
+  font-size:13px;
+  box-shadow:0 16px 32px rgba(15,23,42,.45);
+  transition:opacity .2s ease,transform .2s ease;
+  z-index:50;
+}
+.toast.show{
+  opacity:1;
+  transform:translateX(-50%) translateY(0);
+}
+
+/* =========================================================
+   GRID / TARJETAS CATÁLOGO
+========================================================= */
+
+/* Scoped para no interferir con otros .grid generales */
+[data-kolben] .grid {
+  justify-items: start;   /* muy importante */
+  justify-content: start;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+}
+
+
+/* En móvil: SIEMPRE 2 productos por fila */
+@media (max-width:767px){
+  [data-kolben] .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+}
+
+/* Tarjeta base */
+.card{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:22px;
+  overflow:hidden;
+  box-shadow:0 4px 16px rgba(17,24,39,.06);
+  display:flex;
+  flex-direction:column;
+  position:relative;
+}
+
+/* Bloque superior (imagen) */
+.media-block{padding:14px 16px 0}
+.img-wrap{
+  background:#f1f4f9;
+  border:1px solid #edf0f5;
+  border-radius:18px;
+  height:180px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  position:relative;
+}
+.img-wrap img{
+  width:100%;
+  height:100%;
+  object-fit:contain;
+}
+
+/* Línea SKU centrado debajo de la imagen */
+.sku-center{
+  width:100%;
+  text-align:center;
+  margin-top:8px;
+}
+.sku-center .sku{
+  font-size:14.4px;
+  font-weight:800;
+  color:#000;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Contenido inferior */
+.card-inner{padding:0 16px 16px}
+
+/* Marca + estrella */
+.brandline{
+  font-size:13px;
+  font-weight:700;
+  color:#6b7280;
+  margin-top:10px;
+  text-align:left;
+  letter-spacing:.2px;
+
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+.brandline .brand-txt{
+  flex:1;
+  min-width:0;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* Estrella favoritos */
+.fav-btn{
+  font-size:18px;
+  border:none;
+  background:transparent;
+  cursor:pointer;
+  color:#d1d5db;
+  padding:5px;
+  display:inline-grid;
+  place-items:center;
+  border-radius:999px;
+  transition:color .15s ease,background-color .12s ease,transform .06s ease;
+}
+.fav-btn:hover{
+  background:rgba(15,23,42,.04);
+  color:#9ca3af;
+}
+.fav-btn.active{
+  color:#f59e0b;
+}
+.fav-btn:active{
+  transform:scale(.92);
+}
+
+/* Descripción */
+.desc{
+  font-size:14px;
+  color:#374151;
+  margin-top:8px;
+  line-height:1.3;
+}
+
+/* Pie (píldora + botón) */
+.card-foot{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  justify-content:space-between;
+  margin-top:14px;
+  flex-wrap:nowrap;
+}
+
+/* Píldoras disponibilidad (ESTILO HIGHLIGHT SUAVE) */
+.pill{
+  display:inline-block;
+  padding:8px 14px;
+  border-radius:999px;
+  font-weight:800;
+  font-size:12px;
+  white-space:nowrap;
+  background:#fff;
+  border:1px solid transparent;
+}
+.pill.ok{  
+  color:var(--ok-deep);  
+  border-color:rgba(34,197,94,.45); }
+
+  .pill.low{ color:var(--low-deep); 
+    border-color:rgba(245,158,11,.45); }
+  .pill.bad{ color:var(--bad-deep); 
+    border-color:rgba(239,68,68,.45); }
+  .pill.res{ color:var(--res-deep); 
+    border-color:rgba(14,165,233,.45); }
+
+/* Botón Agregar / Reservar */
+.add{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  background:#14213D;
+  color:#fff;
+  border-radius:14px;
+  padding:10px 16px;
+  flex:1;
+  justify-content:center;
+  box-shadow:0 2px 0 rgba(0,0,0,.1);
+  border:none;
+  cursor:pointer;
+}
+.add:hover,
+.add:active{
+  transform:translateY(-1px);
+  box-shadow:0 6px 14px rgba(17,24,39,.15);
+}
+.add .plus{
+  width:22px;
+  height:22px;
+  border-radius:999px;
+  background:#111827;
+  display:grid;
+  place-items:center;
+  font-weight:800;
+}
+
+/* Chip “n fotos” (multiimagen) */
+.photos-chip{
+  position:absolute;
+  left:10px;
+  bottom:10px;
+  background:rgba(0,0,0,.55);
+  color:#fff;
+  font-weight:800;
+  border-radius:999px;
+  padding:4px 8px;
+  font-size:12px;
+}
+
+/* =========================================================
+   CARRITO / PEDIDOS – LISTAS
+========================================================= */
+
+.cart-list,
+.orders-list{
+  margin-top:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+
+.cart-item,
+.order-item{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background:#f9fafb;
+  font-size:14px;
+}
+
+.cart-item-main{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.cart-item-title{font-weight:600}
+.cart-item-meta{
+  font-size:12px;
+  color:#6b7280;
+}
+
+.cart-qty{
+  display:flex;
+  align-items:center;
+  gap:6px;
+}
+.cart-qty button{
+  width:26px;
+  height:26px;
+  border-radius:999px;
+  border:1px solid #d1d5db;
+  background:#fff;
+  cursor:pointer;
+}
+.cart-qty span{
+  min-width:20px;
+  text-align:center;
+  font-weight:600;
+}
+
+.cart-total{
+  margin-top:12px;
+  text-align:right;
+  font-weight:700;
+}
+
+/* Botones secundarios carrito/pedidos */
+.btn-ghost{
+  border-radius:999px;
+  border:1px solid #d1d5db;
+  padding:6px 12px;
+  background:#fff;
+  cursor:pointer;
+  font-size:13px;
+}
+
+/* =========================================================
+   TABLA DE PEDIDOS (ADMIN)
+========================================================= */
+
+.table-wrap{
+  margin-top:10px;
+  overflow-x:auto;
+}
+.table{
+  width:100%;
+  border-collapse:collapse;
+  font-size:14px;
+}
+.table th,
+.table td{
+  padding:8px 10px;
+  border-bottom:1px solid #e5e7eb;
+}
+.table th{
+  font-weight:600;
+  color:#4b5563;
+}
+.table tr:last-child td{
+  border-bottom:none;
+}
+
+/* =========================================================
+   GRID DE PEDIDOS (ADMIN)
+   - Escritorio: tarjetas en 2 columnas (auto-fit 420px)
+   - Móvil: 1 sola columna a todo el ancho
+========================================================= */
+
+.orders-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(420px,1fr));
+  gap:24px;
+}
+
+/* MÓVIL (≤767px): una tarjeta por fila, ancho completo */
+@media (max-width:767px){
+  .orders-grid{
+    grid-template-columns:1fr;
+    gap:12px;
+  }
+
+  /* Hacemos el panel un poquito más compacto en móvil */
+  .orders-grid .panel{
+    padding:16px 14px;
+  }
+}
+
+/* =========================================================
+   UTILIDADES
+========================================================= */
+
+.hidden{display:none !important}
+.text-right{text-align:right}
+.mt-8{margin-top:8px}
+.mt-12{margin-top:12px}
+
+/* Reset básicos para botones/inputs */
+button,input,textarea{
+  font-family:inherit;
+}
+button:focus{outline:0}
+a{
+  color:inherit;
+  text-decoration:none;
+}
+
+/* ====== OVERRIDES SOLO MÓVIL: pill arriba + botón abajo ====== */
+@media (max-width:767px){
+  /* 2 columnas fijas en catálogo móvil + respiro arriba */
+  .panel .grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    margin-top:12px;
+  }
+
+  /* Pie de tarjeta en columna (catálogo móvil) */
+  [data-kolben] .card-foot{
+    flex-direction:column;
+    align-items:stretch;
+    gap:8px;
+  }
+
+  [data-kolben] .card-foot .pill{
+    width:100%;
+    text-align:center;
+  }
+
+  [data-kolben] .card-foot .add{
+    width:100%;
+    justify-content:center;
+    padding:8px 14px;
+    border-radius:18px;
+  }
+
+  [data-kolben] .card-foot .add .plus{
+    width:20px;
+    height:20px;
+    font-size:13px;
+  }
+}
+
+/* =========================================================
+   TARJETA KOLBEN - AJUSTES SOLO PC (≥ 1024px)
+   Versión más compacta (similar EONIK)
+========================================================= */
+@media (min-width:1024px){
+
+  /* Grilla de productos en escritorio */
+  [data-kolben] .grid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:24px;
+    justify-content:flex-start;
+    align-items:flex-start;
+  }
+
+  /* --- TARJETA COMPACTA --- */
+  [data-kolben] .card{
+    width:280px;
+    max-width:100%;
+  }
+
+  /* Imagen + marco compacto */
+  .media-block{
+    padding:16px 16px 0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  .img-wrap{
+    max-width:230px;
+    width:100%;
+    height:180px;
+    margin:0 auto;
+    border-radius:18px;
+  }
+
+  /* SKU */
+  .sku-center{
+    margin-top:10px;
+    text-align:center;
+  }
+  .sku-center .sku{
+    font-size:13.5px;
+    font-weight:800;
+  }
+
+  /* Contenido inferior */
+  .card-inner{
+    padding:0 16px 16px;
+  }
+
+  .brandline{
+    margin-top:6px;
+    font-size:12.5px;
+  }
+
+  .desc{
+    margin-top:6px;
+    line-height:1.28;
+    font-size:13.5px;
+  }
+
+  /* Pie */
+  .card-foot{
+    margin-top:14px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .card-foot .add{
+    flex:1 0 auto;
+    justify-content:center;
+    padding:9px 18px;
+    border-radius:18px;
+  }
+
+  .card-foot .add .plus{
+    width:18px;
+    height:18px;
+    font-size:12px;
+  }
+}
+
+/* =============================
+   ELIMINAR TODAS LAS LÍNEAS BAJO LOS TABS
+   (PC + MÓVIL)
+============================= */
+
+#tabs,
+#tabs::before,
+#tabs::after {
+  border: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+}
+
+header,
+header::before,
+header::after {
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* =========================================================
+   FIX SOLO MÓVIL: reducir espacio entre "Catálogo" y "Todo"
+========================================================= */
+@media (max-width: 767px) {
+
+  /* Reduce el espacio bajo los tabs */
+  #tabs {
+    margin-bottom: -12px !important;
+  }
+
+  /* Evita que el panel empuje hacia abajo la fila de chips */
+  .panel {
+    margin-top: 0 !important;
+  }
+}
+
+/* =========================================================
+   ESPACIO ENTRE "CATÁLOGO" Y LA CHIP "TODO"
+   Solo móvil (≤767px)
+========================================================= */
+@media (max-width:767px){
+  .chips {
+    padding-top: -8px !important;   /* antes 4px */
+  }
+}
+
+/* =========================================================
+   AJUSTES SOLO PC (≥ 1024px) - TARJETA CATÁLOGO
+   Versión compacta tipo EONIK
+========================================================= */
+@media (min-width:1024px){
+
+  /* GRID escritorio: flex sin columnas invisibles */
+  [data-kolben] .grid{
+    display:flex;
+    flex-wrap:wrap;
+    gap:24px;
+    justify-content:flex-start;
+    align-items:flex-start;
+  }
+
+  /* Tarjeta catálogo compacta */
+  [data-kolben] .card{
+    width:280px;
+    max-width:100%;
+    margin:0;
+  }
+
+  /* Marco imagen centrado */
+  .media-block{
+    padding:20px 20px 0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+  }
+
+  .img-wrap{
+    max-width:240px;
+    width:100%;
+    height:200px;
+    margin:0 auto;
+    border-radius:18px;
+  }
+
+  /* SKU centrado */
+  .sku-center{
+    margin-top:12px;
+    text-align:center;
+  }
+  .sku-center .sku{
+    font-size:14px;
+    font-weight:800;
+  }
+
+  /* Contenido inferior */
+  .card-inner{
+    padding:0 20px 20px;
+  }
+
+  .brandline{
+    margin-top:8px;
+    font-size:13px;
+  }
+
+  .desc{
+    margin-top:6px;
+    line-height:1.3;
+  }
+
+  /* Pie: pill + botón proporcionados */
+  .card-foot{
+    margin-top:16px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+
+  .card-foot .pill{
+    flex:0 0 auto;
+  }
+
+  .card-foot .add{
+    flex:1 0 auto;
+    justify-content:center;
+    padding:10px 22px;
+    border-radius:18px;
+  }
+
+  .card-foot .add .plus{
+    width:20px;
+    height:20px;
+    font-size:13px;
+  }
+}
+
+/* ====== PC (≥1024px): ancho del contenido igual al header ====== */
+@media (min-width:1024px){
+  main{
+    max-width:1180px;   /* mismo ancho que .container del header */
+    margin:0 auto;      /* centrado */
+    padding:8px 16px 24px; /* respiro similar al header */
+  }
+}
+
+/* ============================
+   Carrito ADMIN - vista móvil
+   ============================ */
+
+.cart-cards {
+  display: none;
+}
+
+/* Por defecto, la tabla sí se ve */
+.desktop-only {
+  display: block;
+}
+.mobile-only {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  /* En móvil ocultamos la tabla y usamos las cápsulas */
+  .desktop-only {
+    display: none;
+  }
+  .mobile-only {
+    display: block;
+  }
+
+  .cart-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 8px;
+  }
+
+  .cart-card {
+    background: var(--card, #ffffff);
+    border-radius: 18px;
+    padding: 12px 14px;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+  }
+
+  .cart-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .cart-card-code {
+    font-size: 15px;
+    font-weight: 600;
+    color: #111827;
+  }
+
+
+
+  .cart-card-desc {
+    font-size: 13px;
+    line-height: 1.3;
+    color: #4b5563;
+    margin-bottom: 6px;
+  }
+
+  .cart-card-meta {
+    display: flex;
+    gap: 4px;
+    align-items: baseline;
+    font-size: 12px;
+    color: #6b7280;
+    margin-bottom: 4px;
+  }
+
+  .cart-card-qty-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 4px;
+  }
+
+  .cart-card-qty-row .qty-label {
+    font-size: 12px;
+    color: #6b7280;
+    margin-right: 8px;
+    flex: 1;
+  }
+
+  .cart-card-qty-row .qty-input {
+    width: 64px;
+    text-align: center;
+    font-size: 13px;
+  }
+
+  .cart-card-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  .cart-card-empty {
+    text-align: center;
+    font-size: 13px;
+    color: #6b7280;
+    padding: 16px 8px;
+  }
+}
+
+/* =========================================================
+   ADMIN PRODUCTOS - ESTILO TIPO MAQUETA (MÓVIL)
+   Solo afecta a la página de Productos y solo en ≤ 767px
+========================================================= */
+
+/* Grid general: en móvil una tarjeta debajo de otra */
+@media (max-width: 767px) {
+  .admin-products-header {
+    padding: 12px 14px 14px;
+  }
+
+  .admin-products-header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .admin-products-header-text h1 {
+    font-size: 24px;
+  }
+
+  .admin-products-header-text p {
+    font-size: 12px;
+  }
+
+  .admin-products-header-actions {
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+
+  .admin-products-header-actions .btn {
+    padding: 6px 14px;
+    font-size: 13px;
+    border-radius: 999px;
+  }
+
+  .admin-products-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .product-card {
+    border-radius: 24px;
+    padding: 16px 18px 18px;
+  }
+
+  .product-card-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  /* Línea # Posición tipo cápsula */
+  .product-pos {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .product-pos-label {
+    font-weight: 700;
+    font-size: 14px;
+    color: #111827;
+  }
+
+  .product-pos-input {
+    max-width: 110px;
+    text-align: center;
+    border-radius: 999px !important;
+    padding-inline: 14px;
+    font-weight: 600;
+  }
+
+  /* Campos */
+  .product-field {
+    margin-bottom: 12px;
+  }
+
+  .product-field-label {
+    display: block;
+    font-weight: 700;
+    font-size: 14px;
+    color: #111827;
+    margin-bottom: 4px;
+  }
+
+  .product-grid-3 {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin-bottom: 4px;
+  }
+
+  /* Eliminar: arriba solo escritorio, abajo solo móvil */
+  .product-delete-desktop {
+    /* se oculta en móvil */
+    display: none;
+  }
+
+  .product-card-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  .product-delete-mobile {
+    display: inline-flex;
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+}
+
+/* Escritorio: el botón móvil no se ve */
+.product-delete-mobile {
+  display: none;
+}
+/* =========================================================
+   ADMIN CLIENTES - SOLO MÓVIL (≤ 767px)
+   Bloque "Administrador" más compacto
+========================================================= */
+@media (max-width: 767px) {
+
+  /* Panel donde está el administrador */
+  .admin-clients-panel {
+    border-radius: 24px;
+    padding: 12px 14px 14px;   /* antes: 18px 16px 20px */
+    margin-bottom: 8px;        /* acerca el bloque a “+ Nuevo cliente” */
+  }
+
+  /* Título "Administrador" */
+  .admin-clients-title {
+    font-size: 21px;
+    margin-bottom: 6px;        /* menos aire bajo el título */
+  }
+
+  /* Fila de inputs + botón en columna */
+  .admin-clients-row {
+    display: flex !important;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;                 /* antes 12px */
+    margin-bottom: 4px;        /* separa inputs del botón sin dejar hueco gigante */
+  }
+
+  /* Inputs administrador: cápsula pero un poco más compacta */
+  .admin-clients-input {
+    border-radius: 18px !important;
+    padding: 9px 14px;         /* antes 10px 16px */
+    font-size: 14px;
+  }
+
+  /* Botón Guardar más cercano y ligero */
+  .admin-clients-btn {
+    align-self: flex-end;
+    padding: 7px 18px;         /* antes 9px 22px */
+    border-radius: 999px;
+    font-size: 13px;
+    margin-top: 2px;
+  }
+}
+
+/* ============================
+   ADMIN CLIENTES - TARJETAS MÓVIL
+   Solo aplica en ≤ 767px
+============================ */
+@media (max-width: 767px) {
+  .clients-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 2px;
+  }
+
+  .client-card {
+    background: var(--card, #ffffff);
+    border-radius: 22px;
+    padding: 14px 16px 16px;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+  }
+
+  .client-field {
+    margin-bottom: 10px;
+  }
+
+  .client-field-label {
+    display: block;
+    font-weight: 700;
+    font-size: 14px;
+    color: #111827;
+    margin-bottom: 4px;
+  }
+
+  .client-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;          /* ← NECESARIO para Eliminar / Guardar */
+    margin-top: 8px;
+    flex-wrap: wrap;   /* ← Si hay poco espacio en celular, no se rompe */
+  }
+
+  .client-footer .btn-ghost,
+  .client-footer .btn.primary {
+    padding: 8px 18px;
+    border-radius: 999px;
+    font-size: 13px;
+  }
+}
+/* =========================================================
+   ADMIN PRODUCTOS - LAYOUT ESCRITORIO (≥ 1024px)
+   2 tarjetas por fila dentro de los márgenes del container
+========================================================= */
+@media (min-width: 1024px) {
+
+  /* Grid 2×N para la sección de productos admin */
+  .admin-products-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+    margin-top: 16px;
+  }
+
+  /* Tarjeta un poco más “capsula” pero sin salirse del ancho */
+  .product-card {
+    border-radius: 24px;
+    padding: 18px 20px 20px;
+  }
+
+  .product-card-top {
+    margin-bottom: 12px;
+  }
+
+  /* Campos internos con respiro cómodo en escritorio */
+  .product-field {
+    margin-bottom: 12px;
+  }
+}
+/* =========================================================
+   ADMIN PRODUCTOS - PREVIEW DE IMÁGENES (miniaturas)
+   Estructura general + ajustes por breakpoint
+========================================================= */
+
+/* Estructura base (PC y tablet) */
+.product-images-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.product-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.product-thumb {
+  width: 56px;   /* miniatura aprox. mitad del alto de un input */
+  height: 56px;
+  border-radius: 16px;
+  background: #f3f4f6;
+  border: 1px dashed #d1d5db;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 600;
+  color: #9ca3af;
+}
+
+/* En móvil mantenemos solo el botón "Subir imágenes"
+   para no tocar el diseño que ya estaba aprobado */
+@media (max-width: 767px) {
+  .product-images-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .product-thumbs {
+    display: none;
+  }
+}
+/* OCULTAR botón "Editar logo" SOLO en vista Cliente (catálogo) */
+[data-kolben="catalog"] #logoEditWrap {
+  display: none !important;
+}
+
+/* =========================================================
+   CLIENTE - PEDIDOS MÓVIL (layout tipo admin)
+   Solo afecta a ≤ 767px
+   ========================================================= */
+@media (max-width: 767px) {
+
+  .orders-grid-client {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  .orders-grid-client .panel {
+    border-radius: 22px;
+    padding: 14px 16px 16px;
+    box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+  }
+
+  .order-card-mobile {
+    display: flex;
+    flex-direction: column;
+    font-size: 13px;
+  }
+
+  .order-head-mobile {
+    margin-bottom: 6px;
+  }
+
+  .order-chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+
+
+  .order-code-mobile {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+
+  .order-meta-mobile {
+    font-size: 12px;
+    color: #6b7280;
+  }
+
+  .order-actions-mobile {
+    margin-top: 10px;
+    display: flex;
+    justify-content: flex-end;
+  }
+
+  .order-note-mobile {
+    margin-top: 6px;
+    font-size: 11px;
+    color: #6b7280;
+  }
+
+  .order-card-empty {
+    text-align: center;
+    font-size: 13px;
+    color: #6b7280;
+    padding: 16px 8px;
+  }
+}
+
+/* =========================================================
+   KOLBEN – Unificar chips en móvil (cliente + admin)
+========================================================= */
+@media (max-width: 767px){
+  @import "../styles/chips.mobile.css";
+}
