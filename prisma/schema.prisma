@@ -1,62 +1,128 @@
 // prisma/schema.prisma
 
+// 1) DATASOURCE: conecta Prisma con Neon (la URL viene de prisma.config.ts)
+datasource db {
+  provider = "postgresql"
+}
+
+// 2) GENERATOR: genera el cliente de Prisma
 generator client {
   provider = "prisma-client-js"
 }
 
-datasource db {
-  provider = "postgresql"
- 
+/// Estado de disponibilidad del producto en catálogo
+enum EstadoProducto {
+  DISPONIBLE
+  BAJO_STOCK
+  AGOTADO
+  RESERVA // "Reservar (en camino)"
 }
 
-// =============================
-// MODELOS BÁSICOS KOLBEN
-// =============================
+/// Tipo de producto (para las chips: maestro, auxiliar, pastillas, etc.)
+enum TipoProducto {
+  MAESTRO_FRENOS
+  MAESTRO_CLUTCH
+  AUXILIAR_FRENOS
+  AUXILIAR_CLUTCH
+  PASTILLAS_FRENO
+}
 
-// Clientes que ves en el admin (luego los usaremos para login)
+/// Estado del pedido en el flujo Kolben
+enum EstadoPedido {
+  PENDIENTE
+  PREPARANDO
+  ENVIADO
+}
+
+/// Tipo de línea de pedido (normal o reserva/en camino)
+enum TipoLinea {
+  NORMAL
+  RESERVA
+}
+
+/// Clientes que verán /cliente y tendrán usuario/clave
 model Cliente {
-  id        Int      @id @default(autoincrement())
-  nombre    String
-  codigo    String   @unique // código interno, si quieres
-  usuario   String?  @unique
-  clave     String?  // por ahora en texto plano, luego la encriptamos
+  id         Int       @id @default(autoincrement())
+  codigo     String    @unique           // Código corto para login (usuario)
+  nombre     String
+  email      String?   @unique
+  activo     Boolean   @default(true)
 
-  pedidos   Pedido[]
-  creadoEn  DateTime @default(now())
-  actualizadoEn DateTime @updatedAt
+  // Sucursales activas (A, B, C)
+  sucursalA  Boolean   @default(true)
+  sucursalB  Boolean   @default(false)
+  sucursalC  Boolean   @default(false)
+
+  // Clave para login (en Fase 2 la encriptamos)
+  claveHash  String
+
+  pedidos    Pedido[]
+
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 }
 
-// Pedido que se crea desde el carrito del admin
-model Pedido {
-  id           Int          @id @default(autoincrement())
-  clienteId    Int
-  cliente      Cliente      @relation(fields: [clienteId], references: [id])
-
-  estado       String       // "PENDIENTE" | "PREPARANDO" | "ENVIADO"
-  creadoEn     DateTime     @default(now())
-  actualizadoEn DateTime    @updatedAt
-
-  items        PedidoItem[]
-}
-
-// Ítems que vienen del carrito (cada fila)
-model PedidoItem {
-  id          Int     @id @default(autoincrement())
-  pedidoId    Int
-  pedido      Pedido  @relation(fields: [pedidoId], references: [id])
-
-  codigo      String
+/// Productos Kolben
+model Producto {
+  id          Int             @id @default(autoincrement())
+  sku         String          @unique
+  marca       String
   descripcion String
+  tipo        TipoProducto
+  estado      EstadoProducto  @default(DISPONIBLE)
+
+  /// ETA texto para "Reservar (en camino)", ej. "15/12/2025"
+  eta         String?
+
+  /// Precio de referencia (puede ser null si no queremos guardarlo aquí)
+  precio      Float?
+
+  /// URLs de imágenes almacenadas como JSON (array de strings)
+  imagenes    Json?
+
+  items       PedidoItem[]
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+/// Pedido de un cliente (carrito enviado)
+model Pedido {
+  id         Int           @id @default(autoincrement())
+  clienteId  Int
+  cliente    Cliente       @relation(fields: [clienteId], references: [id])
+  estado     EstadoPedido  @default(PENDIENTE)
+
+  // Dispositivo origen (en el futuro: "pc" | "tablet" | "celular")
+  dispositivoOrigen String?
+  comentario        String?
+
+  items      PedidoItem[]
+
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+}
+
+/// Línea individual de un pedido
+model PedidoItem {
+  id          Int        @id @default(autoincrement())
+
+  pedidoId    Int
+  pedido      Pedido     @relation(fields: [pedidoId], references: [id])
+
+  productoId  Int
+  producto    Producto   @relation(fields: [productoId], references: [id])
 
   // Cantidades por sucursal
-  sucursalA   Int     @default(0)
-  sucursalB   Int     @default(0)
-  sucursalC   Int     @default(0)
+  cantidadA   Int        @default(0)
+  cantidadB   Int        @default(0)
+  cantidadC   Int        @default(0)
 
-  // Tipo de renglón en tu UI ("normal" | "reserva" etc.)
-  tipo        String   @default("normal")
+  tipo        TipoLinea  @default(NORMAL)
 
-  // Estado del producto en catálogo (Disponible, Bajo stock, Llegando, etc.)
-  estadoProd  String? 
-  eta         String? 
+  // Copia del estado+ETA del producto al momento de pedir (para histórico)
+  estadoTexto String?
+  etaTexto    String?
+
+  createdAt   DateTime   @default(now())
 }
