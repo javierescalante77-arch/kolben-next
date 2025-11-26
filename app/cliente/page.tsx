@@ -53,6 +53,13 @@ type ChipKey =
   | "auxiliar_clutch"
   | "pastillas_freno";
 
+type ClienteLite = {
+  id: number;
+  nombre: string;
+  codigo: string;
+  sucursales: 1 | 2 | 3;
+};
+
 /* ================== Chips catálogo ================== */
 
 const CHIPS: { key: ChipKey; label: string }[] = [
@@ -196,6 +203,15 @@ export default function ClientePage() {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
 
+  // Cliente actual + sucursales
+  const [cliente, setCliente] = useState<ClienteLite | null>(null);
+  const [clienteLoading, setClienteLoading] = useState(false);
+  const [clienteError, setClienteError] = useState<string | null>(null);
+
+  // Si no hay cliente aún, por defecto 3 sucursales (modo demo seguro)
+  const sucursalesActivas: 1 | 2 | 3 =
+    (cliente?.sucursales as 1 | 2 | 3) ?? 3;
+
   /* ==== Cargar productos desde /api/productos/list ==== */
 
   useEffect(() => {
@@ -229,6 +245,48 @@ export default function ClientePage() {
     };
 
     load();
+  }, []);
+
+  /* ==== Cargar cliente actual (demo: primer cliente activo) ==== */
+
+  useEffect(() => {
+    const loadClienteActual = async () => {
+      try {
+        setClienteLoading(true);
+        setClienteError(null);
+
+        const res = await fetch("/api/clientes/list");
+        if (!res.ok) throw new Error("Error cargando cliente");
+
+        const data = (await res.json()) as any[];
+
+        const activo = data.find((c) => c.activo) ?? data[0];
+
+        if (!activo) {
+          setCliente(null);
+          return;
+        }
+
+        let suc: 1 | 2 | 3 = 1;
+        if (activo.sucursales === 2) suc = 2;
+        if (activo.sucursales === 3) suc = 3;
+
+        setCliente({
+          id: Number(activo.id),
+          nombre: String(activo.nombre ?? ""),
+          codigo: String(activo.codigo ?? ""),
+          sucursales: suc,
+        });
+      } catch (err) {
+        console.error("Error en loadClienteActual:", err);
+        setClienteError("No se pudo cargar el cliente activo.");
+        setCliente(null);
+      } finally {
+        setClienteLoading(false);
+      }
+    };
+
+    loadClienteActual();
   }, []);
 
   /* ==== Filtro catálogo (chips + buscador) ==== */
@@ -271,6 +329,7 @@ export default function ClientePage() {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
+        // Suma 1 a sucursal A por defecto
         return prev.map((item) =>
           item.product.id === product.id
             ? { ...item, qtyA: item.qtyA + 1 }
@@ -289,15 +348,30 @@ export default function ClientePage() {
     });
   };
 
-  const handleChangeQty = (productId: string, delta: number) => {
+  const updateCartQty = (
+    productId: string,
+    branch: "A" | "B" | "C",
+    value: number
+  ) => {
+    const n = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+
     setCart((prev) => {
-      return prev
-        .map((item) =>
-          item.product.id === productId
-            ? { ...item, qtyA: Math.max(0, item.qtyA + delta) }
-            : item
-        )
-        .filter((item) => item.qtyA > 0 || item.qtyB > 0 || item.qtyC > 0);
+      const next = prev.map((item) => {
+        if (item.product.id !== productId) return item;
+
+        const updated = { ...item };
+
+        if (branch === "A") updated.qtyA = n;
+        if (branch === "B") updated.qtyB = n;
+        if (branch === "C") updated.qtyC = n;
+
+        return updated;
+      });
+
+      // Eliminar líneas totalmente en 0
+      return next.filter(
+        (item) => item.qtyA > 0 || item.qtyB > 0 || item.qtyC > 0
+      );
     });
   };
 
@@ -313,11 +387,19 @@ export default function ClientePage() {
   const handleSendOrder = () => {
     if (cart.length === 0) return;
 
+    // Ajustar cantidades según sucursales activas
+    const sanitizedItems: CartItem[] = cart.map((item) => ({
+      ...item,
+      qtyA: sucursalesActivas >= 1 ? item.qtyA : 0,
+      qtyB: sucursalesActivas >= 2 ? item.qtyB : 0,
+      qtyC: sucursalesActivas >= 3 ? item.qtyC : 0,
+    }));
+
     const newOrder: Order = {
       id: Date.now(),
       createdAt: new Date().toISOString(),
       status: "pendiente",
-      items: cart,
+      items: sanitizedItems,
     };
 
     setOrders((prev) => [newOrder, ...prev]);
@@ -378,11 +460,7 @@ export default function ClientePage() {
       <div data-kolben>
         <div className="grid">
           {filteredProducts.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={p}
-              onAdd={handleAddToCart}
-            />
+            <ProductCard key={p.id} product={p} onAdd={handleAddToCart} />
           ))}
         </div>
       </div>
@@ -391,6 +469,35 @@ export default function ClientePage() {
 
   const renderCartView = () => (
     <section className="panel">
+      {/* Info de cliente y sucursales */}
+      <div
+        style={{
+          marginBottom: 12,
+          fontSize: 13,
+          color: "#4b5563",
+          display: "flex",
+          flexWrap: "wrap",
+          gap: 8,
+          alignItems: "center",
+        }}
+      >
+        {clienteLoading && <span>Cargando cliente…</span>}
+        {clienteError && (
+          <span style={{ color: "#b91c1c" }}>{clienteError}</span>
+        )}
+        {cliente && !clienteLoading && !clienteError && (
+          <>
+            <span>
+              Cliente: <strong>{cliente.nombre}</strong> ({cliente.codigo})
+            </span>
+            <span>·</span>
+            <span>
+              Sucursales activas: <strong>{sucursalesActivas}</strong>
+            </span>
+          </>
+        )}
+      </div>
+
       {cart.length === 0 ? (
         <div style={{ padding: "12px 0" }}>
           Tu carrito está vacío. Agrega productos desde el catálogo.
@@ -409,32 +516,118 @@ export default function ClientePage() {
                   </span>
                 </div>
 
-                <div className="cart-qty">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleChangeQty(item.product.id, -1)
-                    }
-                  >
-                    −
-                  </button>
-                  <span>{item.qtyA}</span>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleChangeQty(item.product.id, 1)
-                    }
-                  >
-                    +
-                  </button>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 16,
+                    flexWrap: "wrap",
+                    alignItems: "flex-end",
+                  }}
+                >
+                  {sucursalesActivas >= 1 && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          marginBottom: 4,
+                          color: "#4b5563",
+                        }}
+                      >
+                        Suc. A
+                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.qtyA}
+                        onChange={(e) =>
+                          updateCartQty(
+                            item.product.id,
+                            "A",
+                            Number(e.target.value)
+                          )
+                        }
+                        style={{
+                          width: 72,
+                          padding: "4px 6px",
+                          borderRadius: 6,
+                          border: "1px solid #d1d5db",
+                          fontSize: 14,
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {sucursalesActivas >= 2 && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          marginBottom: 4,
+                          color: "#4b5563",
+                        }}
+                      >
+                        Suc. B
+                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.qtyB}
+                        onChange={(e) =>
+                          updateCartQty(
+                            item.product.id,
+                            "B",
+                            Number(e.target.value)
+                          )
+                        }
+                        style={{
+                          width: 72,
+                          padding: "4px 6px",
+                          borderRadius: 6,
+                          border: "1px solid #d1d5db",
+                          fontSize: 14,
+                        }}
+                      />
+                    </div>
+                  )}
+
+                  {sucursalesActivas >= 3 && (
+                    <div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          marginBottom: 4,
+                          color: "#4b5563",
+                        }}
+                      >
+                        Suc. C
+                      </div>
+                      <input
+                        type="number"
+                        min={0}
+                        value={item.qtyC}
+                        onChange={(e) =>
+                          updateCartQty(
+                            item.product.id,
+                            "C",
+                            Number(e.target.value)
+                          )
+                        }
+                        style={{
+                          width: 72,
+                          padding: "4px 6px",
+                          borderRadius: 6,
+                          border: "1px solid #d1d5db",
+                          fontSize: 14,
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="cart-total">
-            Total piezas: {totalPiezas}
-          </div>
+          <div className="cart-total">Total piezas: {totalPiezas}</div>
 
           <div className="mt-12" style={{ textAlign: "right" }}>
             <button
