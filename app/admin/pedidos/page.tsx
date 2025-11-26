@@ -1,309 +1,539 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import "../admin.css";
+import { useEffect, useState, Fragment } from "react";
+import "../../cliente/cliente.css";
 
-type EstadoPedido = "PENDIENTE" | "PREPARANDO" | "ENVIADO";
 
-type ClienteApi = {
-  id: number;
-  nombre: string;
-  codigo: string;
-  sucursales: number;
-};
+/* ================== Tipos de la UI ================== */
 
-type ProductoApi = {
-  id: number;
+type OrderStatus = "Pendiente" | "Preparando" | "Enviado";
+
+type OrderItem = {
   sku: string;
-  marca: string;
-  descripcion: string;
+  desc: string;
+  qtyA: number;
+  qtyB: number;
+  qtyC: number;
+  tipo: "NORMAL" | "RESERVA";
+  estadoTexto?: string | null;
+  etaTexto?: string | null;
 };
+
+type Order = {
+  id: string;
+  cliente: string;
+  createdAt: string;
+  device: "PC" | "Móvil" | "Tablet";
+  itemsCount: number;
+  sucursalesActivas: number;
+  estado: OrderStatus;
+  items: OrderItem[];
+};
+
+/* ============ Tipos aproximados de la respuesta API ============ */
 
 type PedidoItemApi = {
   id: number;
   cantidadA: number;
   cantidadB: number;
   cantidadC: number;
+  tipo: "NORMAL" | "RESERVA";
   estadoTexto: string | null;
   etaTexto: string | null;
-  tipo: "NORMAL" | "RESERVA";
-  producto: ProductoApi | null;
+  producto?: {
+    sku: string;
+    marca: string;
+    descripcion: string;
+  } | null;
 };
 
 type PedidoApi = {
   id: number;
   createdAt: string;
-  estado: EstadoPedido;
+  estado: "PENDIENTE" | "PREPARANDO" | "ENVIADO";
   comentario: string | null;
   dispositivoOrigen: string | null;
-  cliente: ClienteApi | null;
+  cliente?: {
+    id: number;
+    nombre: string;
+    codigo: string;
+    sucursales: number;
+  } | null;
   items: PedidoItemApi[];
 };
 
-function formatDate(value: string): string {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("es-HN", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+/* ================== Helpers de mapeo ================== */
 
-function estadoLabel(e: EstadoPedido): string {
+function mapDbEstadoToUi(e: PedidoApi["estado"]): OrderStatus {
   switch (e) {
-    case "PENDIENTE":
-      return "Pendiente";
     case "PREPARANDO":
       return "Preparando";
     case "ENVIADO":
       return "Enviado";
     default:
-      return e;
+      return "Pendiente";
   }
 }
 
-function nextEstado(e: EstadoPedido): EstadoPedido | null {
-  if (e === "PENDIENTE") return "PREPARANDO";
-  if (e === "PREPARANDO") return "ENVIADO";
-  return null;
+function mapUiEstadoToDb(e: OrderStatus): PedidoApi["estado"] {
+  switch (e) {
+    case "Preparando":
+      return "PREPARANDO";
+    case "Enviado":
+      return "ENVIADO";
+    default:
+      return "PENDIENTE";
+  }
 }
 
-function computeTotales(p: PedidoApi) {
-  let totalA = 0;
-  let totalB = 0;
-  let totalC = 0;
-  for (const item of p.items) {
-    totalA += item.cantidadA ?? 0;
-    totalB += item.cantidadB ?? 0;
-    totalC += item.cantidadC ?? 0;
+function mapDevice(dispositivoOrigen: string | null): Order["device"] {
+  if (!dispositivoOrigen) return "PC";
+  const d = dispositivoOrigen.toLowerCase();
+
+  if (d.includes("movil") || d.includes("móvil") || d.includes("iphone") || d.includes("android")) {
+    return "Móvil";
   }
-  const total = totalA + totalB + totalC;
-  return { totalA, totalB, totalC, total };
+  if (d.includes("tablet") || d.includes("ipad")) {
+    return "Tablet";
+  }
+  return "PC";
 }
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleString("es-HN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+}
+
+function mapPedidosApiToOrders(apiPedidos: PedidoApi[]): Order[] {
+  return apiPedidos.map((p) => {
+    const sucursales = p.cliente?.sucursales ?? 1;
+
+    const items: OrderItem[] = p.items.map((it) => ({
+      sku: it.producto?.sku ?? "SIN-SKU",
+      desc: it.producto?.descripcion ?? it.estadoTexto ?? "Producto",
+      qtyA: it.cantidadA ?? 0,
+      qtyB: it.cantidadB ?? 0,
+      qtyC: it.cantidadC ?? 0,
+      tipo: it.tipo ?? "NORMAL",
+      estadoTexto: it.estadoTexto,
+      etaTexto: it.etaTexto,
+    }));
+
+    const itemsCount = items.reduce(
+      (acc, it) => acc + it.qtyA + it.qtyB + it.qtyC,
+      0
+    );
+
+    return {
+      id: String(p.id),
+      cliente: p.cliente?.nombre ?? "Cliente sin nombre",
+      createdAt: formatDate(p.createdAt),
+      device: mapDevice(p.dispositivoOrigen),
+      itemsCount,
+      sucursalesActivas: sucursales,
+      estado: mapDbEstadoToUi(p.estado),
+      items,
+    };
+  });
+}
+
+/* ================== Página Admin / Pedidos ================== */
 
 export default function AdminPedidosPage() {
-  const [pedidos, setPedidos] = useState<PedidoApi[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadPedidos = async () => {
-    try {
-      setLoading(true);
-      setErrorMsg(null);
-      const res = await fetch("/api/pedidos/list");
-      const json = await res.json();
-
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || "Error al listar pedidos");
-      }
-
-      const data = (json.data || []) as PedidoApi[];
-      setPedidos(data);
-    } catch (err: any) {
-      console.error("Error cargando pedidos admin:", err);
-      setErrorMsg(err.message || "Error al cargar pedidos");
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Cargar pedidos reales desde Neon
   useEffect(() => {
-    loadPedidos();
+    const load = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const res = await fetch("/api/pedidos/list", {
+          cache: "no-store",
+        });
+
+        const json = await res.json();
+
+        if (!json.ok || !Array.isArray(json.data)) {
+          console.error("Respuesta inesperada de /api/pedidos/list:", json);
+          setError("Error al cargar pedidos.");
+          setOrders([]);
+          return;
+        }
+
+        const mapped = mapPedidosApiToOrders(json.data as PedidoApi[]);
+        setOrders(mapped);
+      } catch (e: any) {
+        console.error("Error cargando pedidos:", e);
+        setError("No se pudieron cargar los pedidos.");
+        setOrders([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, []);
 
-  const handleCambiarEstado = async (pedido: PedidoApi) => {
-    const siguiente = nextEstado(pedido.estado);
-    if (!siguiente) return;
+  const toggleDetails = (id: string) => {
+    setOpenDetails((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const updateOrderStatus = async (id: string, next: OrderStatus) => {
+    // Optimista en la UI
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { o, ...o, estado: next } : o))
+    );
 
     try {
-      setUpdatingId(pedido.id);
-
       const res = await fetch("/api/pedidos/updateEstado", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          pedidoId: pedido.id,
-          estado: siguiente,
+          pedidoId: Number(id),
+          estado: mapUiEstadoToDb(next),
         }),
       });
 
       const json = await res.json();
-      if (!res.ok || !json.ok) {
-        throw new Error(json.error || "Error al actualizar estado");
+      if (!json.ok) {
+        console.error("Error desde API updateEstado:", json);
       }
-
-      setPedidos((prev) =>
-        prev.map((p) => (p.id === pedido.id ? { ...p, estado: siguiente } : p))
-      );
-    } catch (err: any) {
-      console.error("Error cambiando estado:", err);
-      setErrorMsg(err.message || "Error al cambiar estado");
-    } finally {
-      setUpdatingId(null);
+    } catch (e) {
+      console.error("Error llamando a /api/pedidos/updateEstado:", e);
     }
   };
 
   return (
-    <section className="panel">
-      <div
-        style={{
-          display: "flex",
-          alignItems: "flex-start",
-          justifyContent: "space-between",
-          gap: 16,
-          marginBottom: 12,
-        }}
-      >
-        <div>
-          <h1>Pedidos</h1>
-          <p style={{ marginTop: 4, color: "#6b7280", fontSize: "0.9rem" }}>
-            Lista de pedidos enviados desde el catálogo Kolben.
-          </p>
-        </div>
-
-        <button
-          type="button"
-          onClick={loadPedidos}
-          className="btn-ghost"
-          style={{ whiteSpace: "nowrap" }}
-        >
-          Recargar
-        </button>
-      </div>
+    <div className="container" style={{ paddingTop: 24 }}>
+      <h1 style={{ marginBottom: 20 }}>Pedidos</h1>
 
       {loading && (
-        <p style={{ marginTop: 12, fontSize: "0.9rem" }}>Cargando pedidos…</p>
-      )}
-
-      {errorMsg && (
-        <p style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.9rem" }}>
-          {errorMsg}
-        </p>
-      )}
-
-      {pedidos.length === 0 && !loading && !errorMsg && (
-        <p style={{ marginTop: 12, fontSize: "0.9rem" }}>
-          Aún no hay pedidos registrados.
-        </p>
-      )}
-
-      {pedidos.length > 0 && (
-        <div style={{ marginTop: 16, overflowX: "auto" }}>
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Fecha</th>
-                <th>Cliente</th>
-                <th>Estado</th>
-                <th>Suc.</th>
-                <th>Piezas (A/B/C)</th>
-                <th>Dispositivo</th>
-                <th>Detalle</th>
-                <th>Acción</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pedidos.map((p) => {
-                const tot = computeTotales(p);
-                const suc = p.cliente?.sucursales ?? 1;
-                const isFinal = p.estado === "ENVIADO";
-                const next = nextEstado(p.estado);
-
-                return (
-                  <tr key={p.id}>
-                    <td>{p.id}</td>
-                    <td>{formatDate(p.createdAt)}</td>
-                    <td>
-                      {p.cliente?.nombre ?? "—"}
-                      <br />
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                        {p.cliente?.codigo ?? ""}
-                      </span>
-                    </td>
-                    <td>{estadoLabel(p.estado)}</td>
-                    <td>{suc}</td>
-                    <td>
-                      {tot.total} total
-                      <br />
-                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                        A: {tot.totalA} · B: {tot.totalB} · C: {tot.totalC}
-                      </span>
-                    </td>
-                    <td>{p.dispositivoOrigen ?? "—"}</td>
-                    <td>
-                      <details>
-                        <summary style={{ cursor: "pointer" }}>
-                          Ver ({p.items.length})
-                        </summary>
-                        <div
-                          style={{
-                            marginTop: 4,
-                            maxHeight: 180,
-                            overflowY: "auto",
-                          }}
-                        >
-                          {p.items.map((it) => (
-                            <div
-                              key={it.id}
-                              style={{
-                                fontSize: "0.8rem",
-                                padding: "2px 0",
-                                borderBottom: "1px solid #f3f4f6",
-                              }}
-                            >
-                              <strong>{it.producto?.sku ?? "—"}</strong>{" "}
-                              {it.producto?.descripcion ?? ""}
-                              <br />
-                              <span style={{ color: "#6b7280" }}>
-                                A: {it.cantidadA} · B: {it.cantidadB} · C:{" "}
-                                {it.cantidadC}
-                              </span>
-                              {it.tipo === "RESERVA" && (
-                                <span
-                                  style={{
-                                    marginLeft: 4,
-                                    fontSize: "0.75rem",
-                                  }}
-                                >
-                                  (Reserva {it.etaTexto ?? ""})
-                                </span>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </details>
-                    </td>
-                    <td>
-                      {isFinal || !next ? (
-                        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
-                          Sin cambios
-                        </span>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleCambiarEstado(p)}
-                          disabled={updatingId === p.id}
-                          className="btn-ghost"
-                          style={{ whiteSpace: "nowrap" }}
-                        >
-                          {updatingId === p.id
-                            ? "Actualizando..."
-                            : `Marcar ${estadoLabel(next)}`}
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+        <div className="panel" style={{ padding: 24, textAlign: "center" }}>
+          Cargando pedidos…
         </div>
       )}
-    </section>
+
+      {!loading && error && (
+        <div
+          className="panel"
+          style={{
+            padding: 24,
+            marginBottom: 16,
+            color: "#b91c1c",
+            backgroundColor: "#fef2f2",
+            border: "1px solid #fecaca",
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {!loading && orders.length === 0 && !error && (
+        <div className="panel" style={{ padding: 24, textAlign: "center" }}>
+          No hay pedidos aún.
+        </div>
+      )}
+
+      {/* GRID de tarjetas – 2 columnas en desktop, 1 en móvil */}
+      <div className="orders-grid">
+        {orders.map((order) => {
+          const detalleAbierto = !!openDetails[order.id];
+
+          return (
+            <div
+              key={order.id}
+              className="panel"
+              style={{
+                padding: 24,
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+              }}
+            >
+              {/* ==== CABECERA SUPERIOR ==== */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 16,
+                  marginBottom: 12,
+                  alignItems: "flex-start",
+                }}
+              >
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      marginBottom: 4,
+                    }}
+                  >
+                    <span
+                      className="badge"
+                      style={{
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
+                      }}
+                    >
+                      Pedido
+                    </span>
+
+                    <span
+                      className="badge subtle"
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        backgroundColor: "#f3f4ff",
+                        border: "1px solid #e5e7eb",
+                      }}
+                    >
+                      {order.createdAt}
+                    </span>
+
+                    <span
+                      className="badge subtle"
+                      style={{
+                        padding: "4px 10px",
+                        borderRadius: 999,
+                        backgroundColor: "#f9fafb",
+                        border: "1px solid #e5e7eb",
+                        fontWeight: 500,
+                      }}
+                    >
+                      {order.device}
+                    </span>
+                  </div>
+
+                  <h2 style={{ margin: 0, marginBottom: 4 }}>{order.id}</h2>
+
+                  <div
+                    style={{
+                      fontSize: 14,
+                      color: "#4b5563",
+                      marginBottom: 2,
+                    }}
+                  >
+                    <span style={{ fontWeight: 500 }}>Solicitante</span>{" "}
+                    {order.cliente}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: "#6b7280",
+                    }}
+                  >
+                    {order.itemsCount} ítems · {order.sucursalesActivas}{" "}
+                    sucursal(es) activas
+                  </div>
+                </div>
+
+                {/* columna derecha: estado */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "flex-end",
+                    gap: 8,
+                    minWidth: 160,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontSize: 13,
+                      color: "#6b7280",
+                      marginBottom: 2,
+                    }}
+                  >
+                    Status
+                  </span>
+                  <select
+                    value={order.estado}
+                    onChange={(e) =>
+                      updateOrderStatus(order.id, e.target.value as OrderStatus)
+                    }
+                    className="input"
+                    style={{
+                      padding: "6px 12px",
+                      minWidth: 140,
+                      fontSize: 14,
+                    }}
+                  >
+                    <option value="Pendiente">Pendiente</option>
+                    <option value="Preparando">Preparando</option>
+                    <option value="Enviado">Enviado</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* ==== BOTONES PDF / EDITAR / VER DETALLE ==== */}
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: detalleAbierto ? 12 : 0,
+                }}
+              >
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    type="button"
+                    className="btn secondary"
+                    style={{ padding: "6px 14px", fontSize: 13 }}
+                  >
+                    PDF pedido
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    style={{ padding: "6px 14px", fontSize: 13 }}
+                    onClick={() => toggleDetails(order.id)}
+                  >
+                    {detalleAbierto ? "Ocultar detalle" : "Ver detalle"}
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "#6b7280",
+                    textAlign: "right",
+                  }}
+                >
+                  Actualizar estado aquí se replica en Neon.
+                </div>
+              </div>
+
+              {/* ==== DETALLE DE ÍTEMS ==== */}
+              {detalleAbierto && (
+                <div
+                  style={{
+                    marginTop: 8,
+                    borderTop: "1px dashed #e5e7eb",
+                    paddingTop: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      marginBottom: 8,
+                    }}
+                  >
+                    Detalle de ítems
+                  </div>
+
+                  <div
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "2fr 1fr 1fr 1fr",
+                      columnGap: 8,
+                      rowGap: 4,
+                      fontSize: 13,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontWeight: 500,
+                        color: "#4b5563",
+                      }}
+                    >
+                      SKU · Descripción
+                    </div>
+                    <div style={{ fontWeight: 500, textAlign: "center" }}>
+                      A
+                    </div>
+                    <div style={{ fontWeight: 500, textAlign: "center" }}>
+                      B
+                    </div>
+                    <div style={{ fontWeight: 500, textAlign: "center" }}>
+                      C
+                    </div>
+
+                    {order.items.map((item, idx) => (
+                      <Fragment key={`${order.id}-${idx}`}>
+                        <div
+                          style={{
+                            padding: "4px 0",
+                            borderTop: "1px dashed #f3f4f6",
+                          }}
+                        >
+                          <div>{item.sku}</div>
+                          <div
+                            style={{
+                              fontSize: 12,
+                              color: "#6b7280",
+                            }}
+                          >
+                            {item.desc}
+                          </div>
+                        </div>
+                        <div
+                          style={{
+                            padding: "4px 0",
+                            borderTop: "1px dashed #f3f4f6",
+                            textAlign: "center",
+                          }}
+                        >
+                          {item.qtyA}
+                        </div>
+                        <div
+                          style={{
+                            padding: "4px 0",
+                            borderTop: "1px dashed #f3f4f6",
+                            textAlign: "center",
+                          }}
+                        >
+                          {item.qtyB}
+                        </div>
+                        <div
+                          style={{
+                            padding: "4px 0",
+                            borderTop: "1px dashed #f3f4f6",
+                            textAlign: "center",
+                          }}
+                        >
+                          {item.qtyC}
+                        </div>
+                      </Fragment>
+                    ))}
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: 8,
+                      fontSize: 13,
+                      color: "#6b7280",
+                    }}
+                  >
+                    Clientes no pueden editar tras <strong>Preparando</strong> /{" "}
+                    <strong>Enviado</strong>.
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
