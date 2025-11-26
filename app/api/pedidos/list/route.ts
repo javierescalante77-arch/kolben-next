@@ -1,13 +1,17 @@
+// app/api/pedidos/list/route.ts
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
     const pedidos = await prisma.pedido.findMany({
       orderBy: { createdAt: "desc" },
-
       include: {
         cliente: true,
-        items: true,
+        items: {
+          include: {
+            producto: true,
+          },
+        },
       },
     });
 

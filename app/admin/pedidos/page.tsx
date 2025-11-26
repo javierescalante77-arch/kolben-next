@@ -1,334 +1,309 @@
 "use client";
 
-import { useState } from "react";
-import "../../cliente/cliente.css";
+import { useEffect, useState } from "react";
+import "../admin.css";
 
-/**
- * Estados posibles del pedido
- */
-type OrderStatus = "Pendiente" | "Preparando" | "Enviado";
+type EstadoPedido = "PENDIENTE" | "PREPARANDO" | "ENVIADO";
 
-/**
- * Tipo de ítem dentro de un pedido
- */
-type OrderItem = {
+type ClienteApi = {
+  id: number;
+  nombre: string;
+  codigo: string;
+  sucursales: number;
+};
+
+type ProductoApi = {
+  id: number;
   sku: string;
-  desc: string;
-  qtyA: number;
-  qtyB: number;
-  qtyC: number;
+  marca: string;
+  descripcion: string;
 };
 
-/**
- * Tipo de pedido para la vista admin
- */
-type Order = {
-  id: string; // ejemplo: "ORD-001"
-  cliente: string;
-  createdAt: string; // texto ya formateado: "21/11/2025, 10:29:42 AM"
-  device: "PC" | "Móvil" | "Tablet";
-  itemsCount: number;
-  sucursalesActivas: number; // 1, 2 o 3
-  estado: OrderStatus;
-  items: OrderItem[];
+type PedidoItemApi = {
+  id: number;
+  cantidadA: number;
+  cantidadB: number;
+  cantidadC: number;
+  estadoTexto: string | null;
+  etaTexto: string | null;
+  tipo: "NORMAL" | "RESERVA";
+  producto: ProductoApi | null;
 };
 
-/**
- * Datos demo en memoria (hasta conectar Prisma / DB real)
- */
-const sampleOrders: Order[] = [
-  {
-    id: "ORD-001",
-    cliente: "Repuestos Don Julio",
-    createdAt: "21/11/2025, 10:29:42 AM",
-    device: "PC",
-    itemsCount: 7,
-    sucursalesActivas: 3,
-    estado: "Pendiente",
-    items: [
-      {
-        sku: "KB-001",
-        desc: "Cilindro maestro frenos delantero · sedán compacto",
-        qtyA: 2,
-        qtyB: 1,
-        qtyC: 0,
-      },
-      {
-        sku: "KB-003",
-        desc: "Auxiliar de frenos trasero · uso severo",
-        qtyA: 3,
-        qtyB: 0,
-        qtyC: 1,
-      },
-    ],
-  },
-  {
-    id: "ORD-002",
-    cliente: "AutoCentro Eléctrico",
-    createdAt: "20/11/2025, 10:14:42 PM",
-    device: "PC",
-    itemsCount: 6,
-    sucursalesActivas: 2,
-    estado: "Preparando",
-    items: [
-      {
-        sku: "KB-004",
-        desc: "Pastillas frenos cerámicas · mayor vida útil",
-        qtyA: 4,
-        qtyB: 2,
-        qtyC: 0,
-      },
-    ],
-  },
-];
+type PedidoApi = {
+  id: number;
+  createdAt: string;
+  estado: EstadoPedido;
+  comentario: string | null;
+  dispositivoOrigen: string | null;
+  cliente: ClienteApi | null;
+  items: PedidoItemApi[];
+};
 
-/**
- * Página de pedidos (admin) con layout EONIK + "Ver detalle"
- */
+function formatDate(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("es-HN", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+function estadoLabel(e: EstadoPedido): string {
+  switch (e) {
+    case "PENDIENTE":
+      return "Pendiente";
+    case "PREPARANDO":
+      return "Preparando";
+    case "ENVIADO":
+      return "Enviado";
+    default:
+      return e;
+  }
+}
+
+function nextEstado(e: EstadoPedido): EstadoPedido | null {
+  if (e === "PENDIENTE") return "PREPARANDO";
+  if (e === "PREPARANDO") return "ENVIADO";
+  return null;
+}
+
+function computeTotales(p: PedidoApi) {
+  let totalA = 0;
+  let totalB = 0;
+  let totalC = 0;
+  for (const item of p.items) {
+    totalA += item.cantidadA ?? 0;
+    totalB += item.cantidadB ?? 0;
+    totalC += item.cantidadC ?? 0;
+  }
+  const total = totalA + totalB + totalC;
+  return { totalA, totalB, totalC, total };
+}
+
 export default function AdminPedidosPage() {
-  const [orders, setOrders] = useState<Order[]>(sampleOrders);
+  const [pedidos, setPedidos] = useState<PedidoApi[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
 
-  // control local: qué pedidos tienen el detalle abierto
-  const [openDetails, setOpenDetails] = useState<Record<string, boolean>>({});
+  const loadPedidos = async () => {
+    try {
+      setLoading(true);
+      setErrorMsg(null);
+      const res = await fetch("/api/pedidos/list");
+      const json = await res.json();
 
-  const toggleDetails = (id: string) => {
-    setOpenDetails((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "Error al listar pedidos");
+      }
+
+      const data = (json.data || []) as PedidoApi[];
+      setPedidos(data);
+    } catch (err: any) {
+      console.error("Error cargando pedidos admin:", err);
+      setErrorMsg(err.message || "Error al cargar pedidos");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const updateOrderStatus = (id: string, next: OrderStatus) => {
-    setOrders((prev) =>
-      prev.map((o) => (o.id === id ? { ...o, estado: next } : o))
-    );
+  useEffect(() => {
+    loadPedidos();
+  }, []);
+
+  const handleCambiarEstado = async (pedido: PedidoApi) => {
+    const siguiente = nextEstado(pedido.estado);
+    if (!siguiente) return;
+
+    try {
+      setUpdatingId(pedido.id);
+
+      const res = await fetch("/api/pedidos/updateEstado", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pedidoId: pedido.id,
+          estado: siguiente,
+        }),
+      });
+
+      const json = await res.json();
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "Error al actualizar estado");
+      }
+
+      setPedidos((prev) =>
+        prev.map((p) => (p.id === pedido.id ? { ...p, estado: siguiente } : p))
+      );
+    } catch (err: any) {
+      console.error("Error cambiando estado:", err);
+      setErrorMsg(err.message || "Error al cambiar estado");
+    } finally {
+      setUpdatingId(null);
+    }
   };
 
   return (
-    <div className="container" style={{ paddingTop: 24 }}>
-      <h1 style={{ marginBottom: 20 }}>Pedidos</h1>
-
-      {orders.length === 0 && (
-        <div className="panel" style={{ padding: 24, textAlign: "center" }}>
-          No hay pedidos aún.
+    <section className="panel">
+      <div
+        style={{
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 16,
+          marginBottom: 12,
+        }}
+      >
+        <div>
+          <h1>Pedidos</h1>
+          <p style={{ marginTop: 4, color: "#6b7280", fontSize: "0.9rem" }}>
+            Lista de pedidos enviados desde el catálogo Kolben.
+          </p>
         </div>
+
+        <button
+          type="button"
+          onClick={loadPedidos}
+          className="btn-ghost"
+          style={{ whiteSpace: "nowrap" }}
+        >
+          Recargar
+        </button>
+      </div>
+
+      {loading && (
+        <p style={{ marginTop: 12, fontSize: "0.9rem" }}>Cargando pedidos…</p>
       )}
 
-      {/* GRID de tarjetas – 2 columnas en desktop, 1 en móvil */}
-      <div className="orders-grid">
-        {orders.map((order) => {
-          const detalleAbierto = !!openDetails[order.id];
+      {errorMsg && (
+        <p style={{ marginTop: 8, color: "#b91c1c", fontSize: "0.9rem" }}>
+          {errorMsg}
+        </p>
+      )}
 
-          return (
-            <div
-              key={order.id}
-              className="panel"
-              style={{
-                padding: 24,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-              }}
-            >
-              {/* ==== CABECERA SUPERIOR ==== */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: 16,
-                  gap: 16,
-                }}
-              >
-                {/* Lado izquierdo: fecha/hora + título + solicitante + ítems */}
-                <div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                      fontSize: 13,
-                      color: "#4b5563",
-                    }}
-                  >
-                    <span
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        backgroundColor: "#f3f4ff",
-                        border: "1px solid #e5e7eb",
-                      }}
-                    >
-                      {order.createdAt}
-                    </span>
+      {pedidos.length === 0 && !loading && !errorMsg && (
+        <p style={{ marginTop: 12, fontSize: "0.9rem" }}>
+          Aún no hay pedidos registrados.
+        </p>
+      )}
 
-                    <span
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        backgroundColor: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        fontWeight: 500,
-                      }}
-                    >
-                      {order.device}
-                    </span>
-                  </div>
+      {pedidos.length > 0 && (
+        <div style={{ marginTop: 16, overflowX: "auto" }}>
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Fecha</th>
+                <th>Cliente</th>
+                <th>Estado</th>
+                <th>Suc.</th>
+                <th>Piezas (A/B/C)</th>
+                <th>Dispositivo</th>
+                <th>Detalle</th>
+                <th>Acción</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pedidos.map((p) => {
+                const tot = computeTotales(p);
+                const suc = p.cliente?.sucursales ?? 1;
+                const isFinal = p.estado === "ENVIADO";
+                const next = nextEstado(p.estado);
 
-                  <h2 style={{ margin: 0, marginBottom: 4 }}>{order.id}</h2>
-
-                  <div
-                    style={{
-                      fontSize: 14,
-                      color: "#4b5563",
-                      marginBottom: 2,
-                    }}
-                  >
-                    <span style={{ fontWeight: 500 }}>Solicitante</span>{" "}
-                    {order.cliente}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      color: "#4b5563",
-                    }}
-                  >
-                    Ítems{" "}
-                    <span style={{ fontWeight: 600 }}>{order.itemsCount}</span>
-                  </div>
-                </div>
-
-                {/* Lado derecho: selector de status */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-end",
-                    gap: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: "#6b7280",
-                      marginBottom: 2,
-                    }}
-                  >
-                    Status
-                  </span>
-                  <select
-                    value={order.estado}
-                    onChange={(e) =>
-                      updateOrderStatus(order.id, e.target.value as OrderStatus)
-                    }
-                    className="input"
-                    style={{
-                      padding: "6px 12px",
-                      minWidth: 140,
-                      fontSize: 14,
-                    }}
-                  >
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="Preparando">Preparando</option>
-                    <option value="Enviado">Enviado</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* ==== BOTONES PDF / EDITAR / VER DETALLE ==== */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  marginBottom: 16,
-                  alignItems: "center",
-                }}
-              >
-                <button
-                  type="button"
-                  className="btn light"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 999,
-                    fontSize: 14,
-                  }}
-                >
-                  PDF
-                </button>
-
-                {/* Solo visible mientras el pedido esté Pendiente */}
-                {order.estado === "Pendiente" && (
-                  <button
-                    type="button"
-                    className="btn-ghost"
-                    style={{
-                      padding: "8px 18px",
-                      borderRadius: 999,
-                      fontSize: 14,
-                    }}
-                  >
-                    Editar
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  className="btn primary"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 999,
-                    fontSize: 14,
-                  }}
-                  onClick={() => toggleDetails(order.id)}
-                >
-                  {detalleAbierto ? "Ocultar detalle" : "Ver detalle"}
-                </button>
-              </div>
-
-              {/* ==== DETALLE TABLA (SKU / DESC / A B C) ==== */}
-              {detalleAbierto && (
-                <div className="table-wrap" style={{ marginBottom: 12 }}>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>SKU</th>
-                        <th>Descripción</th>
-                        {order.sucursalesActivas >= 1 && <th>A</th>}
-                        {order.sucursalesActivas >= 2 && <th>B</th>}
-                        {order.sucursalesActivas >= 3 && <th>C</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {order.items.map((it, idx) => (
-                        <tr key={idx}>
-                          <td>{it.sku}</td>
-                          <td>{it.desc}</td>
-                          {order.sucursalesActivas >= 1 && <td>{it.qtyA}</td>}
-                          {order.sucursalesActivas >= 2 && <td>{it.qtyB}</td>}
-                          {order.sucursalesActivas >= 3 && <td>{it.qtyC}</td>}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* ==== NOTA FINAL ==== */}
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 13,
-                  color: "#6b7280",
-                }}
-              >
-                Clientes no pueden editar tras <strong>Preparando</strong> /
-                <strong> Enviado</strong>.
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
+                return (
+                  <tr key={p.id}>
+                    <td>{p.id}</td>
+                    <td>{formatDate(p.createdAt)}</td>
+                    <td>
+                      {p.cliente?.nombre ?? "—"}
+                      <br />
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                        {p.cliente?.codigo ?? ""}
+                      </span>
+                    </td>
+                    <td>{estadoLabel(p.estado)}</td>
+                    <td>{suc}</td>
+                    <td>
+                      {tot.total} total
+                      <br />
+                      <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                        A: {tot.totalA} · B: {tot.totalB} · C: {tot.totalC}
+                      </span>
+                    </td>
+                    <td>{p.dispositivoOrigen ?? "—"}</td>
+                    <td>
+                      <details>
+                        <summary style={{ cursor: "pointer" }}>
+                          Ver ({p.items.length})
+                        </summary>
+                        <div
+                          style={{
+                            marginTop: 4,
+                            maxHeight: 180,
+                            overflowY: "auto",
+                          }}
+                        >
+                          {p.items.map((it) => (
+                            <div
+                              key={it.id}
+                              style={{
+                                fontSize: "0.8rem",
+                                padding: "2px 0",
+                                borderBottom: "1px solid #f3f4f6",
+                              }}
+                            >
+                              <strong>{it.producto?.sku ?? "—"}</strong>{" "}
+                              {it.producto?.descripcion ?? ""}
+                              <br />
+                              <span style={{ color: "#6b7280" }}>
+                                A: {it.cantidadA} · B: {it.cantidadB} · C:{" "}
+                                {it.cantidadC}
+                              </span>
+                              {it.tipo === "RESERVA" && (
+                                <span
+                                  style={{
+                                    marginLeft: 4,
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  (Reserva {it.etaTexto ?? ""})
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </details>
+                    </td>
+                    <td>
+                      {isFinal || !next ? (
+                        <span style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                          Sin cambios
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleCambiarEstado(p)}
+                          disabled={updatingId === p.id}
+                          className="btn-ghost"
+                          style={{ whiteSpace: "nowrap" }}
+                        >
+                          {updatingId === p.id
+                            ? "Actualizando..."
+                            : `Marcar ${estadoLabel(next)}`}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
   );
 }
