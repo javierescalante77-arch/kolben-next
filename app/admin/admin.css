@@ -1,185 +1,97 @@
-/* ====== Shell ====== */
-:root {
-  --card: #ffffff;
-  --line: #e5e7eb;
-  --yam: #f59e0b;
+/* ============================
+   LAYOUT ADMIN KOLBEN
+============================ */
+
+.admin-layout {
+  background: #f7f6f3;
+  min-height: 100vh;
 }
 
-.container {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 16px;
-  overflow-x: hidden;
-}
-
-header {
+/* Header */
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb;
   position: sticky;
   top: 0;
-  z-index: 20;
-  background: var(--card);
-  border-bottom: 1px solid var(--line);
+  z-index: 50;
 }
 
-.topbar {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 0;
-  flex-wrap: nowrap;
-}
-
-.brand-wrap {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.brand-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  cursor: pointer;
-  background: transparent !important;
-  border: none !important;
-  padding: 0;
-  box-shadow: none !important;
-  outline: 0 !important;
-}
-
-.brand-img {
-  height: 60px;
-  max-width: 100%;
+/* Logo */
+.admin-logo img {
+  height: 34px;
   object-fit: contain;
 }
 
-.brand-text {
-  font-weight: 800;
-  font-size: 28px;
-  color: var(--yam);
-  letter-spacing: .5px;
-}
-
-#logoEditWrap {
+/* Nav Principal */
+.admin-nav {
   display: flex;
-  gap: 8px;
-  align-items: center;
+  gap: 16px;
 }
 
-#logoEditBtn {
-  border: 1px solid var(--line);
-  background: #fff;
-  color: #111827;
-  border-radius: 10px;
-  padding: 6px 10px;
-  font-size: 13px;
+.admin-tab {
+  padding: 6px 12px;
+  background: rgba(234,146,22,0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1f2937;
+  transition: 0.15s ease;
 }
 
-nav#tabs {
-  display: flex;
-  gap: 10px;
-  margin-left: 12px;
+.admin-tab:hover {
+  background: rgba(234,146,22,0.25);
 }
 
-nav#tabs .tab {
-  padding: 10px 14px;
-  border-radius: 12px;
-  background: #eef2f7;
-  color: #111827;
-  cursor: pointer;
-  font-weight: 700;
-  white-space: nowrap;
+/* Botón salir */
+.admin-exit-btn {
+  padding: 6px 12px;
+  color: #ef4444;
+  background: rgba(239,68,68,0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  transition: 0.15s ease;
 }
 
-nav#tabs .tab.active {
-  background: var(--yam);
-  color: #fff;
+.admin-exit-btn:hover {
+  background: rgba(239,68,68,0.25);
 }
 
-/* Botones */
-button,
-.btn {
-  border: none;
-  cursor: pointer;
-  border-radius: 12px;
-  padding: 10px 14px;
-  font-weight: 800;
-  transition: transform .08s ease;
+/* Contenido */
+.admin-panel {
+  padding: 20px;
 }
 
-.btn.primary {
-  background: #14213d;
-  color: #fff;
-}
+/* ============================
+   RESPONSIVE
+============================ */
+@media (max-width: 640px) {
+  .admin-header {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
 
-.btn.light {
-  background: #fff;
-  border: 1px solid var(--line);
-  color: #111827;
-}
+  .admin-nav {
+    order: 3;
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
 
-/* Panel */
-.panel {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 18px;
-  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.1);
-}
+  .admin-exit {
+    order: 2;
+  }
 
-/* =========================================================
-   KOLBEN – Unificar chips en móvil (admin)
-========================================================= */
-@media (max-width: 767px){
-  @import "../styles/chips.mobile.css";
+  .admin-panel {
+    padding: 14px;
+  }
 }
-
-/* ===== Tabla admin productos ===== */
-
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.9rem;
-}
-
-.admin-table thead {
-  background: #f3f4f6; /* tono gris claro */
-}
-
-.admin-table th,
-.admin-table td {
-  padding: 8px 12px;
-  text-align: left;
-  border-bottom: 1px solid #e5e7eb;
-}
-
-/* Primera columna (ID) más angosta */
-.admin-table th:first-child,
-.admin-table td:first-child {
-  width: 60px;
-}
-
-/* SKU y Tipo con ancho cómodo pero sin romper todo */
-.admin-table th:nth-child(2),
-.admin-table td:nth-child(2) {
-  white-space: nowrap;
-}
-.admin-table th:nth-child(5),
-.admin-table td:nth-child(5) {
-  white-space: nowrap;
-}
-
-/* Descripción puede partirse en varias líneas */
-.admin-table th:nth-child(4),
-.admin-table td:nth-child(4) {
-  max-width: 260px;
-  white-space: normal;
-}
-
-/* Columna imágenes: que no se haga eterna */
-.admin-table th:nth-child(7),
-.admin-table td:nth-child(7) {
-  max-width: 260px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+/* Estado activo de tabs admin */
+.admin-tab-active {
+  background: #ea9216;
+  color: #ffffff;
 }

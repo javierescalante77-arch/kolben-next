@@ -1,76 +1,60 @@
 "use client";
 
-import "./productos.css";
 import { useEffect, useState } from "react";
+import "./productos.css";
+import "../admin.css";
 
-type ProductStatus = "disponible" | "bajo" | "agotado" | "reserva";
-
-type Product = {
-  id: string;
+type Producto = {
+  id: number;
   sku: string;
   brand: string;
   desc: string;
-  status: ProductStatus;
-  type: string;
+  category: string;
+  status: string;
   imgs: string[];
 };
 
-export default function AdminProductosPage() {
-  const [products, setProducts] = useState<Product[]>([]);
+export default function ProductosPage() {
+  const [productos, setProductos] = useState<Producto[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+
+  /* =============================
+     Cargar productos desde API
+  ==============================*/
+  async function loadProductos() {
+    try {
+      const res = await fetch("/api/productos/list");
+      if (!res.ok) throw new Error("Error cargando productos");
+      const data = await res.json();
+
+      // Normalizamos imágenes: garantizar []
+      const normalized = data.map((p: Producto) => ({
+        ...p,
+        imgs: Array.isArray(p.imgs) ? p.imgs : [],
+      }));
+
+      setProductos(normalized);
+    } catch (err) {
+      console.error("Error en loadProductos:", err);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const res = await fetch("/api/productos/list");
-        const json = await res.json();
-
-        console.log("JSON desde /api/productos/list:", json);
-
-        // Soporta dos formatos: array directo o { ok, data }
-        const data: Product[] = Array.isArray(json)
-          ? json
-          : Array.isArray(json.data)
-          ? json.data
-          : [];
-
-        console.log("Productos normalizados:", data);
-        (window as any).__productos = data; // para inspeccionar en consola
-
-        setProducts(data);
-      } catch (err: any) {
-        console.error("Error cargando productos (admin):", err);
-        setError(err?.message ?? "Error desconocido");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
+    loadProductos();
   }, []);
 
   return (
-    <main className="panel">
-      <h1 style={{ marginBottom: 16 }}>Productos</h1>
+    <div className="admin-panel">
+      <h1 className="admin-title">Productos</h1>
 
-      {loading && <p>Cargando productos.</p>}
-
-      {error && !loading && (
-        <p style={{ color: "red", marginBottom: 16 }}>
-          Error al cargar productos: {error}
-        </p>
-      )}
-
-      {!loading && !error && products.length === 0 && (
-        <p style={{ opacity: 0.7 }}>Todavía no hay productos en la base.</p>
-      )}
-
-      {!loading && !error && products.length > 0 && (
-        <div className="admin-table-container">
+      <div className="admin-table-container">
+        {loading ? (
+          <p style={{ padding: 20 }}>Cargando...</p>
+        ) : productos.length === 0 ? (
+          <p style={{ padding: 20 }}>No hay productos aún.</p>
+        ) : (
           <table className="admin-table">
             <thead>
               <tr>
@@ -78,64 +62,50 @@ export default function AdminProductosPage() {
                 <th>SKU</th>
                 <th>Marca</th>
                 <th>Descripción</th>
-                <th>Tipo</th>
+                <th>Categoría</th>
                 <th>Estado</th>
                 <th>Imágenes</th>
               </tr>
             </thead>
+
             <tbody>
-              {products.map((p) => {
-                const allImgs = Array.isArray(p.imgs)
-                  ? p.imgs.filter(
-                      (url) => typeof url === "string" && url.trim() !== ""
-                    )
-                  : [];
+              {productos.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.id}</td>
+                  <td>{p.sku}</td>
+                  <td>{p.brand}</td>
+                  <td>{p.desc}</td>
+                  <td>{p.category}</td>
+                  <td>{p.status}</td>
 
-                const visibleImgs = allImgs.slice(0, 3);
-                const extraCount = allImgs.length - visibleImgs.length;
+                  {/* ========================
+                      Miniaturas desde CSS
+                  ========================= */}
+                  <td className="imagenes-cell">
+                    {p.imgs.length === 0 ? (
+                      <span className="thumb-more">Sin imágenes</span>
+                    ) : (
+                      <div className="imagenes-thumbs">
+                        {p.imgs.slice(0, 3).map((img, idx) => (
+                          <div key={idx} className="thumb-wrap">
+                            <img src={img} className="thumb" />
+                          </div>
+                        ))}
 
-                return (
-                  <tr key={p.id}>
-                    <td>{p.id}</td>
-                    <td>{p.sku}</td>
-                    <td>{p.brand}</td>
-                    <td>{p.desc}</td>
-                    <td>{p.type}</td>
-                    <td>{p.status}</td>
-                    <td className="imagenes-cell">
-                      {allImgs.length === 0 ? (
-                        "—"
-                      ) : (
-                        <div className="imagenes-thumbs">
-                          {visibleImgs.map((url, idx) => (
-                            <div className="thumb-wrap" key={idx}>
-                              {url ? (
-                                <img
-                                  src={url}
-                                  alt={`Producto ${p.sku} (${idx + 1})`}
-                                  className="thumb"
-                                />
-                              ) : (
-                                <span className="thumb-placeholder">IMG</span>
-                              )}
-                            </div>
-                          ))}
-
-                          {extraCount > 0 && (
-                            <span className="thumb-more">
-                              +{extraCount}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        {p.imgs.length > 3 && (
+                          <span className="thumb-more">
+                            +{p.imgs.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
-        </div>
-      )}
-    </main>
+        )}
+      </div>
+    </div>
   );
 }

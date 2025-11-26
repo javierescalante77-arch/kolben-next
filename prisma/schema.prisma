@@ -1,23 +1,85 @@
-// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
 
-// 1) DATASOURCE: conecta Prisma con Neon usando .env
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-// 2) GENERATOR: genera el cliente de Prisma
-generator client {
-  provider = "prisma-client-js"
+/// Clientes que verán /cliente y tendrán usuario/clave
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String
+  codigo    String   @unique
+  activo    Boolean  @default(true)
+  claveHash String
+
+  sucursales Int @default(1)
+  
+  createdAt DateTime @default(now())
+  email     String?  @unique
+  sucursalA Boolean  @default(true)
+  sucursalB Boolean  @default(false)
+  sucursalC Boolean  @default(false)
+  updatedAt DateTime @default(now()) @updatedAt
+  pedidos   Pedido[]
 }
 
+/// Productos Kolben
+model Producto {
+  id          Int            @id @default(autoincrement())
+  sku         String         @unique
+  marca       String
+  descripcion String
+  tipo        TipoProducto
+  estado      EstadoProducto @default(DISPONIBLE)
+  /// ETA texto para "Reservar (en camino)", ej. "15/12/2025"
+  eta         String?
+  /// Precio de referencia (puede ser null si no queremos guardarlo aquí)
+  precio      Float?
+  /// URLs de imágenes almacenadas como JSON (array de strings)
+  imagenes    Json?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now()) @updatedAt
+  items       PedidoItem[]
+}
+
+/// Pedido de un cliente (carrito enviado)
+model Pedido {
+  id                Int          @id @default(autoincrement())
+  clienteId         Int
+  comentario        String?
+  createdAt         DateTime     @default(now())
+  dispositivoOrigen String?
+  updatedAt         DateTime     @default(now()) @updatedAt
+  estado            EstadoPedido @default(PENDIENTE)
+  cliente           Cliente      @relation(fields: [clienteId], references: [id])
+  items             PedidoItem[]
+}
+
+/// Línea individual de un pedido
+model PedidoItem {
+  id          Int       @id @default(autoincrement())
+  pedidoId    Int
+  cantidadA   Int       @default(0)
+  cantidadB   Int       @default(0)
+  cantidadC   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  estadoTexto String?
+  etaTexto    String?
+  productoId  Int
+  tipo        TipoLinea @default(NORMAL)
+  pedido      Pedido    @relation(fields: [pedidoId], references: [id])
+  producto    Producto  @relation(fields: [productoId], references: [id])
+}
 
 /// Estado de disponibilidad del producto en catálogo
 enum EstadoProducto {
   DISPONIBLE
   BAJO_STOCK
   AGOTADO
-  RESERVA // "Reservar (en camino)"
+  RESERVA
 }
 
 /// Tipo de producto (para las chips: maestro, auxiliar, pastillas, etc.)
@@ -40,91 +102,4 @@ enum EstadoPedido {
 enum TipoLinea {
   NORMAL
   RESERVA
-}
-
-/// Clientes que verán /cliente y tendrán usuario/clave
-model Cliente {
-  id         Int       @id @default(autoincrement())
-  codigo     String    @unique           // Código corto para login (usuario)
-  nombre     String
-  email      String?   @unique
-  activo     Boolean   @default(true)
-
-  // Sucursales activas (A, B, C)
-  sucursalA  Boolean   @default(true)
-  sucursalB  Boolean   @default(false)
-  sucursalC  Boolean   @default(false)
-
-  // Clave para login (en Fase 2 la encriptamos)
-  claveHash  String
-
-  pedidos    Pedido[]
-
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
-}
-
-/// Productos Kolben
-model Producto {
-  id          Int             @id @default(autoincrement())
-  sku         String          @unique
-  marca       String
-  descripcion String
-  tipo        TipoProducto
-  estado      EstadoProducto  @default(DISPONIBLE)
-
-  /// ETA texto para "Reservar (en camino)", ej. "15/12/2025"
-  eta         String?
-
-  /// Precio de referencia (puede ser null si no queremos guardarlo aquí)
-  precio      Float?
-
-  /// URLs de imágenes almacenadas como JSON (array de strings)
-  imagenes    Json?
-
-  items       PedidoItem[]
-
-  createdAt   DateTime        @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
-}
-
-/// Pedido de un cliente (carrito enviado)
-model Pedido {
-  id         Int           @id @default(autoincrement())
-  clienteId  Int
-  cliente    Cliente       @relation(fields: [clienteId], references: [id])
-  estado     EstadoPedido  @default(PENDIENTE)
-
-  // Dispositivo origen (en el futuro: "pc" | "tablet" | "celular")
-  dispositivoOrigen String?
-  comentario        String?
-
-  items      PedidoItem[]
-
-  createdAt  DateTime      @default(now())
-  updatedAt  DateTime  @default(now()) @updatedAt
-}
-
-/// Línea individual de un pedido
-model PedidoItem {
-  id          Int        @id @default(autoincrement())
-
-  pedidoId    Int
-  pedido      Pedido     @relation(fields: [pedidoId], references: [id])
-
-  productoId  Int
-  producto    Producto   @relation(fields: [productoId], references: [id])
-
-  // Cantidades por sucursal
-  cantidadA   Int        @default(0)
-  cantidadB   Int        @default(0)
-  cantidadC   Int        @default(0)
-
-  tipo        TipoLinea  @default(NORMAL)
-
-  // Copia del estado+ETA del producto al momento de pedir (para histórico)
-  estadoTexto String?
-  etaTexto    String?
-
-  createdAt   DateTime   @default(now())
 }
