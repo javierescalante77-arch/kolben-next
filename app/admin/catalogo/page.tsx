@@ -1,23 +1,19 @@
+// app/admin/catalogo/page.tsx
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import "../admin.css";
+import "../productos/productos.css";
 
-/* ================== Tipos ================== */
-
+/**
+ * Tipos de producto y estados exactamente como los que devuelve
+ * /api/productos/list
+ */
 type ProductStatus = "disponible" | "bajo" | "agotado" | "reserva";
 
-type ProductType =
-  | "maestro_frenos"
-  | "maestro_clutch"
-  | "auxiliar_frenos"
-  | "auxiliar_clutch"
-  | "pastillas_freno";
-
-type ChipKey =
+type TipoProducto =
   | "todo"
-  | "favoritos"
   | "maestro_frenos"
   | "maestro_clutch"
   | "auxiliar_frenos"
@@ -30,287 +26,202 @@ type Product = {
   brand: string;
   desc: string;
   status: ProductStatus;
-  type: ProductType;
+  eta?: string;
+  type: TipoProducto;
   imgs: string[];
-  eta?: string | null;
 };
 
-/* ================== Config chips ================== */
+type ApiResponse = {
+  ok: boolean;
+  data?: Product[];
+  error?: string;
+};
 
-const CHIPS: { key: ChipKey; label: string }[] = [
-  { key: "todo", label: "Todo" },
-  { key: "favoritos", label: "⭐ Favoritos" },
-  { key: "maestro_frenos", label: "Maestro de frenos" },
-  { key: "maestro_clutch", label: "Maestro de clutch" },
-  { key: "auxiliar_frenos", label: "Auxiliar de frenos" },
-  { key: "auxiliar_clutch", label: "Auxiliar de clutch" },
-  { key: "pastillas_freno", label: "Pastillas de freno" },
-];
+export default function CatalogoAdminPage() {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-/* ================== Helpers visuales ================== */
+  useEffect(() => {
+    let cancelled = false;
 
-function pillFor(status: ProductStatus, eta?: string | null) {
-  switch (status) {
-    case "disponible":
-      return <span className="pill ok">Disponible</span>;
-    case "bajo":
-      return <span className="pill low">Bajo stock</span>;
-    case "agotado":
-      return <span className="pill bad">Agotado</span>;
-    case "reserva": {
-      // Si viene ETA, la usamos; si no, solo "Llegando"
-      const label = eta && eta.trim() ? `Llegando · ${eta}` : "Llegando";
-      return <span className="pill res">{label}</span>;
+    async function load() {
+      try {
+        const res = await fetch("/api/productos/list");
+        if (!res.ok) {
+          throw new Error(`Error HTTP ${res.status}`);
+        }
+
+        const json = (await res.json()) as ApiResponse;
+
+        if (!json.ok) {
+          throw new Error(json.error || "Error cargando productos");
+        }
+
+        if (!cancelled && json.data) {
+          setProducts(json.data);
+        }
+      } catch (err: any) {
+        console.error("Error cargando catálogo admin:", err);
+        if (!cancelled) {
+          setError(err?.message ?? "Error cargando productos");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  return (
+    <main className="container">
+      <h1 style={{ marginBottom: 16 }}>Catálogo (admin)</h1>
+
+      {loading && <p>Cargando productos…</p>}
+
+      {error && !loading && (
+        <div
+          style={{
+            marginTop: 12,
+            marginBottom: 12,
+            padding: 12,
+            borderRadius: 8,
+            background: "#fef2f2",
+            border: "1px solid #fecaca",
+            color: "#b91c1c",
+            fontSize: 14,
+          }}
+        >
+          {error}
+        </div>
+      )}
+
+      {!loading && !error && (
+        <div className="admin-table-container">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>SKU</th>
+                <th>Marca</th>
+                <th>Descripción</th>
+                <th>Tipo</th>
+                <th>Estado</th>
+                <th>Imágenes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.length === 0 && (
+                <tr>
+                  <td colSpan={7} style={{ textAlign: "center", padding: 16 }}>
+                    No hay productos aún.
+                  </td>
+                </tr>
+              )}
+
+              {products.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.id}</td>
+                  <td
+                    style={{
+                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco",
+                    }}
+                  >
+                    {p.sku}
+                  </td>
+                  <td>{p.brand}</td>
+                  <td>{p.desc}</td>
+                  <td>{labelTipo(p.type)}</td>
+                  <td>{labelEstado(p.status, p.eta)}</td>
+                  <td>
+                    {p.imgs && p.imgs.length > 0 ? (
+                      <div
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 8,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 64,
+                            height: 64,
+                            position: "relative",
+                            borderRadius: 8,
+                            overflow: "hidden",
+                            border: "1px solid #e5e7eb",
+                            background: "#f9fafb",
+                          }}
+                        >
+                          <Image
+                            src={p.imgs[0]}
+                            alt={p.desc || p.sku}
+                            fill
+                            style={{ objectFit: "contain" }}
+                          />
+                        </div>
+                        {p.imgs.length > 1 && (
+                          <span
+                            style={{
+                              fontSize: 12,
+                              color: "#6b7280",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            +{p.imgs.length - 1} foto(s)
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ fontSize: 12, color: "#9ca3af" }}>
+                        Sin imagen
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </main>
+  );
+}
+
+function labelTipo(tipo: TipoProducto): string {
+  switch (tipo) {
+    case "maestro_frenos":
+      return "Maestro de frenos";
+    case "maestro_clutch":
+      return "Maestro de clutch";
+    case "auxiliar_frenos":
+      return "Auxiliar de frenos";
+    case "auxiliar_clutch":
+      return "Auxiliar de clutch";
+    case "pastillas_freno":
+      return "Pastillas de freno";
     default:
-      return null;
+      return "N/D";
   }
 }
 
-/* ================== Tarjeta de producto ================== */
-
-function ProductCard({
-  product,
-  onAdd,
-}: {
-  product: Product;
-  onAdd: (p: Product) => void;
-}) {
-  const [favorite, setFavorite] = useState(false);
-
-  // Cargar favorito desde localStorage
-  useEffect(() => {
-    const stored = localStorage.getItem("fav_" + product.id);
-    setFavorite(stored === "1");
-  }, [product.id]);
-
-  const toggleFavorite = () => {
-    const next = !favorite;
-    setFavorite(next);
-    if (next) localStorage.setItem("fav_" + product.id, "1");
-    else localStorage.removeItem("fav_" + product.id);
-  };
-
-  const hasFotosExtra = product.imgs && product.imgs.length > 1;
-  const isDisabled = product.status === "agotado";
-  const buttonLabel = product.status === "reserva" ? "Reservar" : "Agregar";
-
-  const mainImg =
-    product.imgs && product.imgs.length > 0
-      ? product.imgs[0]
-      : "/img/placeholder.png";
-
-  return (
-    <div className="card">
-      {/* Bloque de imagen + SKU igual a EONIK */}
-      <div className="media-block">
-        <div className="img-wrap">
-          <Image
-            src={mainImg}
-            alt={product.desc}
-            fill
-            sizes="(max-width: 767px) 50vw, 25vw"
-          />
-
-          {hasFotosExtra && (
-            <span className="photos-chip">
-              {product.imgs.length} fotos
-            </span>
-          )}
-        </div>
-
-        <div className="sku-center">
-          <span className="sku">{product.sku}</span>
-        </div>
-      </div>
-
-      {/* Contenido inferior */}
-      <div className="card-inner">
-        {/* Marca + estrella */}
-        <div className="brandline">
-          <span className="brand-txt">{product.brand}</span>
-          <button
-            type="button"
-            className={`fav-btn ${favorite ? "active" : ""}`}
-            onClick={toggleFavorite}
-          >
-            ★
-          </button>
-        </div>
-
-        <div className="desc">{product.desc}</div>
-
-        {/* Píldora + botón */}
-        <div className="card-foot">
-          {pillFor(product.status, product.eta ?? undefined)}
-
-          <button
-            type="button"
-            className={`add ${isDisabled ? "disabled" : ""}`}
-            disabled={isDisabled}
-            onClick={() => onAdd(product)}
-          >
-            <span className="plus">+</span>
-            <span>{buttonLabel}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ================== Página Catálogo (admin) ================== */
-
-export default function CatalogoAdminPage() {
-  // Estado de filtros
-  const [chip, setChip] = useState<ChipKey>("todo");
-  const [query, setQuery] = useState("");
-
-  // Estado de datos
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-
-  // Cargar productos desde la API REAL
-  useEffect(() => {
-    const load = async () => {
-      try {
-        setLoading(true);
-        setErrorMsg(null);
-
-        const res = await fetch("/api/productos/list");
-        if (!res.ok) {
-          throw new Error(`HTTP ${res.status}`);
-        }
-
-        const json = await res.json();
-
-        if (!json.ok || !Array.isArray(json.data)) {
-          throw new Error("Respuesta inesperada de la API");
-        }
-
-        // Aseguramos estructura mínima
-        const mapped: Product[] = json.data.map((p: any) => ({
-          id: String(p.id),
-          sku: p.sku ?? "",
-          brand: p.brand ?? "",
-          desc: p.desc ?? "",
-          status: p.status as ProductStatus,
-          type: p.type as ProductType,
-          imgs: Array.isArray(p.imgs) ? p.imgs : [],
-          eta: p.eta ?? null,
-        }));
-
-        setProducts(mapped);
-      } catch (err: any) {
-        console.error("Error cargando productos:", err);
-        setErrorMsg("No se pudieron cargar los productos.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    load();
-  }, []);
-
-  // Filtro en memoria (chip + buscador)
-  const filteredProducts = useMemo(() => {
-    let result = products;
-
-    if (chip !== "todo") {
-      if (chip === "favoritos") {
-        result = result.filter((p) => {
-          const stored = localStorage.getItem("fav_" + p.id);
-          return stored === "1";
-        });
-      } else {
-        result = result.filter((p) => p.type === chip);
-      }
-    }
-
-    if (query.trim()) {
-      const q = query.toLowerCase();
-      result = result.filter(
-        (p) =>
-          p.sku.toLowerCase().includes(q) ||
-          p.brand.toLowerCase().includes(q) ||
-          p.desc.toLowerCase().includes(q)
-      );
-    }
-
-    return result;
-  }, [products, chip, query]);
-
-  // Placeholder: luego aquí conectamos al carrito real
-  const handleAdd = (p: Product) => {
-    console.log("Agregar al carrito (aún demo):", p.sku);
-  };
-
-  return (
-    <main>
-      <section className="panel">
-        {/* Header simple con link de regreso al admin si lo necesitas */}
-        <div className="row" style={{ marginBottom: 16 }}>
-          <Link href="/admin" className="btn light">
-            ← Volver al panel
-          </Link>
-        </div>
-
-        {/* Chips de filtro */}
-        <div className="chips">
-          {CHIPS.map((c) => (
-            <button
-              key={c.key}
-              type="button"
-              className={`chip ${chip === c.key ? "active" : ""}`}
-              onClick={() => setChip(c.key)}
-            >
-              {c.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Buscador */}
-        <div className="row">
-          <input
-            type="text"
-            placeholder="Buscar por código, marca, modelo..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <button
-            type="button"
-            className="btn light"
-            onClick={() => setQuery("")}
-          >
-            Limpiar
-          </button>
-        </div>
-
-        {/* Mensajes de estado */}
-        {loading && (
-          <div style={{ padding: "1rem 0" }}>Cargando productos…</div>
-        )}
-
-        {errorMsg && !loading && (
-          <div style={{ padding: "1rem 0", color: "#b91c1c" }}>{errorMsg}</div>
-        )}
-
-        {!loading && !errorMsg && filteredProducts.length === 0 && (
-          <div style={{ padding: "1rem 0" }}>
-            No hay productos que coincidan con el filtro.
-          </div>
-        )}
-
-        {/* Grid Kolben (igual estructura que antes) */}
-        <div data-kolben>
-          <div className="grid">
-            {filteredProducts.map((p) => (
-              <ProductCard key={p.id} product={p} onAdd={handleAdd} />
-            ))}
-          </div>
-        </div>
-      </section>
-    </main>
-  );
+function labelEstado(status: ProductStatus, eta?: string): string {
+  switch (status) {
+    case "disponible":
+      return "Disponible";
+    case "bajo":
+      return "Bajo stock";
+    case "agotado":
+      return "Agotado";
+    case "reserva":
+      return eta && eta.trim()
+        ? `En camino · ${eta.trim()}`
+        : "En camino";
+    default:
+      return "N/D";
+  }
 }
