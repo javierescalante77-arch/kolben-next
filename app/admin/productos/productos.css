@@ -1,0 +1,115 @@
+/* Contenedor que centra y limita el ancho */
+.admin-table-container {
+  margin-top: 20px;
+  background: #ffffff;
+  padding: 24px;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+  overflow-x: auto;
+}
+
+/* Tabla */
+.admin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+  min-width: 900px; /* Para que no se apriete */
+}
+
+/* Encabezado */
+.admin-table thead {
+  background: #f3f4f6;
+}
+
+.admin-table th {
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 600;
+  color: #111827;
+  border-bottom: 2px solid #e5e7eb;
+  white-space: nowrap;
+}
+
+/* Filas alternadas */
+.admin-table tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+
+.admin-table td {
+  padding: 10px 14px;
+  color: #374151;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+/* Hover */
+.admin-table tbody tr:hover {
+  background: #eef2ff;
+}
+
+/* Columna imágenes más pequeña en texto/base */
+.admin-table td.imagenes-cell {
+  font-size: 0.8rem;
+  color: #6b7280;
+}
+
+/* Forzamos tabla "normal" (por si algo la transformaba) */
+.admin-table {
+  display: table !important;
+  width: 100% !important;
+  background: white !important;
+  color: black !important;
+}
+
+.admin-table th,
+.admin-table td {
+  border: 1px solid #ddd !important;
+  padding: 6px !important;
+}
+
+/* =========================
+   Miniaturas de imágenes
+   ========================= */
+
+.imagenes-cell {
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.imagenes-thumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.thumb-wrap {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #e5e7eb;
+  background: #f9fafb;
+  flex-shrink: 0;
+}
+
+.thumb-wrap img.thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb-placeholder {
+  width: 100%;
+  height: 100%;
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.thumb-more {
+  font-size: 11px;
+  color: #6b7280;
+}

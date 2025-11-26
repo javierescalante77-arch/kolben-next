@@ -1,22 +1,21 @@
-// app/api/pedidos/list/route.ts
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
 
 export async function GET() {
   try {
     const pedidos = await prisma.pedido.findMany({
-      orderBy: { creadoEn: "desc" },
+      orderBy: { createdAt: "desc" },
+
       include: {
         cliente: true,
         items: true,
       },
     });
 
-    return NextResponse.json({ ok: true, pedidos });
-  } catch (error) {
-    console.error("Error listando pedidos", error);
-    return NextResponse.json(
-      { ok: false, error: "Error interno al listar pedidos" },
+    return Response.json({ ok: true, data: pedidos });
+  } catch (err) {
+    console.error("Error listando pedidos:", err);
+    return Response.json(
+      { ok: false, error: "Error listando pedidos" },
       { status: 500 }
     );
   }

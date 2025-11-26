@@ -1492,3 +1492,36 @@ header::after {
 @media (max-width: 767px){
   @import "../styles/chips.mobile.css";
 }
+/* ============================
+   Tabs correctas del cliente
+   (Catálogo / Carrito / Pedidos)
+   ============================ */
+
+.cliente-tabs {
+  display: flex;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 12px 16px;
+  background: var(--card);
+  border-bottom: 1px solid var(--line);
+}
+
+.cliente-tabs button {
+  padding: 6px 14px;
+  border-radius: 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.cliente-tabs button.active {
+  background: var(--yam);
+  border-color: var(--yam);
+  color: white;
+}
+/* Crear espacio bajo el header del cliente */
+.cliente-container {
+  margin-top: 60px; /* Ajustable si el header es más alto */
+}

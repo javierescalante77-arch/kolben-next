@@ -1,28 +1,19 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 
-type Status = "disponible" | "bajo" | "agotado" | "reserva";
+/* ================== Tipos ================== */
 
-type TipoProducto =
-  | "todo"
+type ProductStatus = "disponible" | "bajo" | "agotado" | "reserva";
+
+type ProductType =
   | "maestro_frenos"
   | "maestro_clutch"
   | "auxiliar_frenos"
-  | "auxiliar_clutch";
-
-type Product = {
-  id: string;
-  sku: string;
-  brand: string;
-  desc: string;
-  status: Status;
-  eta?: string;
-  type: TipoProducto;
-  imgs: string[];
-};
+  | "auxiliar_clutch"
+  | "pastillas_freno";
 
 type ChipKey =
   | "todo"
@@ -30,7 +21,21 @@ type ChipKey =
   | "maestro_frenos"
   | "maestro_clutch"
   | "auxiliar_frenos"
-  | "auxiliar_clutch";
+  | "auxiliar_clutch"
+  | "pastillas_freno";
+
+type Product = {
+  id: string;
+  sku: string;
+  brand: string;
+  desc: string;
+  status: ProductStatus;
+  type: ProductType;
+  imgs: string[];
+  eta?: string | null;
+};
+
+/* ================== Config chips ================== */
 
 const CHIPS: { key: ChipKey; label: string }[] = [
   { key: "todo", label: "Todo" },
@@ -39,9 +44,12 @@ const CHIPS: { key: ChipKey; label: string }[] = [
   { key: "maestro_clutch", label: "Maestro de clutch" },
   { key: "auxiliar_frenos", label: "Auxiliar de frenos" },
   { key: "auxiliar_clutch", label: "Auxiliar de clutch" },
+  { key: "pastillas_freno", label: "Pastillas de freno" },
 ];
 
-function pillFor(status: Status, eta?: string) {
+/* ================== Helpers visuales ================== */
+
+function pillFor(status: ProductStatus, eta?: string | null) {
   switch (status) {
     case "disponible":
       return <span className="pill ok">Disponible</span>;
@@ -49,12 +57,17 @@ function pillFor(status: Status, eta?: string) {
       return <span className="pill low">Bajo stock</span>;
     case "agotado":
       return <span className="pill bad">Agotado</span>;
-    case "reserva":
-      return <span className="pill res">Llegando</span>;
+    case "reserva": {
+      // Si viene ETA, la usamos; si no, solo "Llegando"
+      const label = eta && eta.trim() ? `Llegando · ${eta}` : "Llegando";
+      return <span className="pill res">{label}</span>;
+    }
     default:
       return null;
   }
 }
+
+/* ================== Tarjeta de producto ================== */
 
 function ProductCard({
   product,
@@ -65,6 +78,7 @@ function ProductCard({
 }) {
   const [favorite, setFavorite] = useState(false);
 
+  // Cargar favorito desde localStorage
   useEffect(() => {
     const stored = localStorage.getItem("fav_" + product.id);
     setFavorite(stored === "1");
@@ -77,31 +91,26 @@ function ProductCard({
     else localStorage.removeItem("fav_" + product.id);
   };
 
-  const hasFotosExtra = product.imgs.length > 1;
+  const hasFotosExtra = product.imgs && product.imgs.length > 1;
   const isDisabled = product.status === "agotado";
-  const buttonLabel =
-    product.status === "reserva" ? "Reservar" : "Agregar";
+  const buttonLabel = product.status === "reserva" ? "Reservar" : "Agregar";
+
+  const mainImg =
+    product.imgs && product.imgs.length > 0
+      ? product.imgs[0]
+      : "/img/placeholder.png";
 
   return (
     <div className="card">
       {/* Bloque de imagen + SKU igual a EONIK */}
       <div className="media-block">
         <div className="img-wrap">
-          {product.imgs[0] ? (
-            <Image
-              src={product.imgs[0]}
-              alt={product.desc}
-              fill
-              sizes="(max-width: 767px) 50vw, 25vw"
-            />
-          ) : (
-            <Image
-              src="/img/placeholder.png"
-              alt={product.desc}
-              fill
-              sizes="(max-width: 767px) 50vw, 25vw"
-            />
-          )}
+          <Image
+            src={mainImg}
+            alt={product.desc}
+            fill
+            sizes="(max-width: 767px) 50vw, 25vw"
+          />
 
           {hasFotosExtra && (
             <span className="photos-chip">
@@ -117,7 +126,7 @@ function ProductCard({
 
       {/* Contenido inferior */}
       <div className="card-inner">
-        {/* Marca + estrella en la misma fila */}
+        {/* Marca + estrella */}
         <div className="brandline">
           <span className="brand-txt">{product.brand}</span>
           <button
@@ -133,7 +142,7 @@ function ProductCard({
 
         {/* Píldora + botón */}
         <div className="card-foot">
-          {pillFor(product.status, product.eta)}
+          {pillFor(product.status, product.eta ?? undefined)}
 
           <button
             type="button"
@@ -150,49 +159,78 @@ function ProductCard({
   );
 }
 
-const MOCK_PRODUCTS: Product[] = [
-  {
-    id: "1",
-    sku: "47201-04150",
-    brand: "Toyota",
-    desc: "Tacoma 05-15 Automático 15/16",
-    status: "disponible",
-    type: "maestro_frenos",
-    imgs: ["/img/ejemplo1.png"],
-  },
-  {
-    id: "2",
-    sku: "47201-60460",
-    brand: "Toyota",
-    desc: "Cilindro maestro Corolla 3 tornillos 13/16",
-    status: "reserva",
-    eta: "15/12/2025",
-    type: "maestro_frenos",
-    imgs: ["/img/ejemplo2.png"],
-  },
-];
+/* ================== Página Catálogo (admin) ================== */
 
 export default function CatalogoAdminPage() {
+  // Estado de filtros
   const [chip, setChip] = useState<ChipKey>("todo");
   const [query, setQuery] = useState("");
 
-  const products = useMemo(() => {
-    let filtered = MOCK_PRODUCTS;
+  // Estado de datos
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Cargar productos desde la API REAL
+  useEffect(() => {
+    const load = async () => {
+      try {
+        setLoading(true);
+        setErrorMsg(null);
+
+        const res = await fetch("/api/productos/list");
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+
+        const json = await res.json();
+
+        if (!json.ok || !Array.isArray(json.data)) {
+          throw new Error("Respuesta inesperada de la API");
+        }
+
+        // Aseguramos estructura mínima
+        const mapped: Product[] = json.data.map((p: any) => ({
+          id: String(p.id),
+          sku: p.sku ?? "",
+          brand: p.brand ?? "",
+          desc: p.desc ?? "",
+          status: p.status as ProductStatus,
+          type: p.type as ProductType,
+          imgs: Array.isArray(p.imgs) ? p.imgs : [],
+          eta: p.eta ?? null,
+        }));
+
+        setProducts(mapped);
+      } catch (err: any) {
+        console.error("Error cargando productos:", err);
+        setErrorMsg("No se pudieron cargar los productos.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+  }, []);
+
+  // Filtro en memoria (chip + buscador)
+  const filteredProducts = useMemo(() => {
+    let result = products;
 
     if (chip !== "todo") {
       if (chip === "favoritos") {
-        filtered = filtered.filter((p) => {
+        result = result.filter((p) => {
           const stored = localStorage.getItem("fav_" + p.id);
           return stored === "1";
         });
       } else {
-        filtered = filtered.filter((p) => p.type === chip);
+        result = result.filter((p) => p.type === chip);
       }
     }
 
     if (query.trim()) {
       const q = query.toLowerCase();
-      filtered = filtered.filter(
+      result = result.filter(
         (p) =>
           p.sku.toLowerCase().includes(q) ||
           p.brand.toLowerCase().includes(q) ||
@@ -200,17 +238,25 @@ export default function CatalogoAdminPage() {
       );
     }
 
-    return filtered;
-  }, [chip, query]);
+    return result;
+  }, [products, chip, query]);
 
+  // Placeholder: luego aquí conectamos al carrito real
   const handleAdd = (p: Product) => {
-    // Aquí irá la lógica real de agregar al carrito del admin
-    // Por ahora lo dejamos vacío.
+    console.log("Agregar al carrito (aún demo):", p.sku);
   };
 
   return (
     <main>
       <section className="panel">
+        {/* Header simple con link de regreso al admin si lo necesitas */}
+        <div className="row" style={{ marginBottom: 16 }}>
+          <Link href="/admin" className="btn light">
+            ← Volver al panel
+          </Link>
+        </div>
+
+        {/* Chips de filtro */}
         <div className="chips">
           {CHIPS.map((c) => (
             <button
@@ -224,6 +270,7 @@ export default function CatalogoAdminPage() {
           ))}
         </div>
 
+        {/* Buscador */}
         <div className="row">
           <input
             type="text"
@@ -240,9 +287,25 @@ export default function CatalogoAdminPage() {
           </button>
         </div>
 
+        {/* Mensajes de estado */}
+        {loading && (
+          <div style={{ padding: "1rem 0" }}>Cargando productos…</div>
+        )}
+
+        {errorMsg && !loading && (
+          <div style={{ padding: "1rem 0", color: "#b91c1c" }}>{errorMsg}</div>
+        )}
+
+        {!loading && !errorMsg && filteredProducts.length === 0 && (
+          <div style={{ padding: "1rem 0" }}>
+            No hay productos que coincidan con el filtro.
+          </div>
+        )}
+
+        {/* Grid Kolben (igual estructura que antes) */}
         <div data-kolben>
           <div className="grid">
-            {products.map((p) => (
+            {filteredProducts.map((p) => (
               <ProductCard key={p.id} product={p} onAdd={handleAdd} />
             ))}
           </div>

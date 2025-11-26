@@ -7,7 +7,7 @@ import "./globals.css";
  * Página de inicio / landing muy simple para ambiente de desarrollo.
  * Desde aquí puedes entrar como:
  *  - Administrador → /admin/catalogo
- *  - Cliente demo → /cliente/catalogo
+ *  - Cliente demo → /cliente
  *
  * En producción, esta pantalla se sustituirá por el login real.
  */
@@ -95,10 +95,7 @@ export default function HomePage() {
               </ul>
 
               <div className="landing-actions">
-                <Link
-                  href="/cliente/catalogo"
-                  className="landing-btn secondary"
-                >
+                <Link href="/cliente" className="landing-btn secondary">
                   Entrar como Cliente demo
                 </Link>
               </div>

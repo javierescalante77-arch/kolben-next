@@ -1,22 +1,29 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import "./cliente.css";
 
 /* ================== Tipos ================== */
 
-type ProductStatus =
-  | "Disponible"
-  | "Bajo stock"
-  | "Agotado"
-  | "Reservar (en camino)";
+type ProductStatus = "disponible" | "bajo" | "agotado" | "reserva";
+
+type ProductType =
+  | "maestro_frenos"
+  | "maestro_clutch"
+  | "auxiliar_frenos"
+  | "auxiliar_clutch"
+  | "pastillas_freno";
 
 type Product = {
+  id: string;
   sku: string;
   brand: string;
   desc: string;
   status: ProductStatus;
+  type: ProductType | string;
   imgs: string[];
+  eta?: string | null;
 };
 
 type CartItem = {
@@ -26,14 +33,16 @@ type CartItem = {
   qtyC: number;
 };
 
-type OrderStatus = "Pendiente" | "Preparando" | "Enviado";
+type OrderStatus = "pendiente" | "preparando" | "enviado";
 
 type Order = {
   id: number;
-  items: CartItem[];
   createdAt: string;
   status: OrderStatus;
+  items: CartItem[];
 };
+
+type TabKey = "catalog" | "cart" | "orders";
 
 type ChipKey =
   | "todo"
@@ -44,143 +53,128 @@ type ChipKey =
   | "auxiliar_clutch"
   | "pastillas_freno";
 
-/* ================== Datos de demo ================== */
+/* ================== Chips catálogo ================== */
 
-const sampleProducts: Product[] = [
-  {
-    sku: "47201-04150",
-    brand: "Toyota",
-    desc: "Tacoma 05–15 Automático 15/16",
-    status: "Disponible",
-    imgs: ["/placeholder-1.png"],
-  },
-  {
-    sku: "47201-60460",
-    brand: "Toyota",
-    desc: "Cilindro maestro Corolla 3 tornillos 13/16",
-    status: "Reservar (en camino)",
-    imgs: ["/placeholder-2.png"],
-  },
-  {
-    sku: "47210-AD200",
-    brand: "Nissan",
-    desc: "Cilindro maestro Tiida 95–05",
-    status: "Bajo stock",
-    imgs: ["/placeholder-3.png"],
-  },
-  {
-    sku: "KB-001",
-    brand: "Kolben",
-    desc: "Cilindro maestro de frenos delantero · sedán compacto",
-    status: "Disponible",
-    imgs: ["/placeholder-4.png"],
-  },
+const CHIPS: { key: ChipKey; label: string }[] = [
+  { key: "todo", label: "Todo" },
+  { key: "favoritos", label: "⭐ Favoritos" },
+  { key: "maestro_frenos", label: "Maestro de frenos" },
+  { key: "maestro_clutch", label: "Maestro de clutch" },
+  { key: "auxiliar_frenos", label: "Auxiliar de frenos" },
+  { key: "auxiliar_clutch", label: "Auxiliar de clutch" },
+  { key: "pastillas_freno", label: "Pastillas de freno" },
 ];
 
 /* ================== Helpers visuales ================== */
 
-function pillFor(status: ProductStatus) {
-  if (status === "Agotado") {
-    return <span className="pill bad">Agotado</span>;
+function pillFor(status: ProductStatus, eta?: string | null) {
+  switch (status) {
+    case "disponible":
+      return <span className="pill ok">Disponible</span>;
+    case "bajo":
+      return <span className="pill low">Bajo stock</span>;
+    case "agotado":
+      return <span className="pill bad">Agotado</span>;
+    case "reserva": {
+      const label = eta && eta.trim() ? `En camino · ${eta}` : "En camino";
+      return <span className="pill res">{label}</span>;
+    }
+    default:
+      return null;
   }
-  if (status === "Bajo stock") {
-    return <span className="pill low">Bajo stock</span>;
-  }
-  if (status === "Reservar (en camino)") {
-    return <span className="pill res">Llegando</span>;
-  }
-  return <span className="pill ok">Disponible</span>;
-}
-
-function firstImg(p: Product) {
-  const src = p.imgs && p.imgs[0];
-  if (src) {
-    return <img src={src} alt={p.sku} />;
-  }
-
-  return (
-    <svg
-      width="140"
-      height="96"
-      viewBox="0 0 140 96"
-      xmlns="http://www.w3.org/2000/svg"
-    >
-      <rect x="8" y="12" width="124" height="72" fill="#e5e7eb" />
-      <circle cx="48" cy="46" r="14" fill="#d1d5db" />
-      <path
-        d="M68 70L88 44L108 70H68Z"
-        fill="#c4cad4"
-        stroke="#dbe1ea"
-        strokeWidth="4"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
 }
 
 /* ================== Tarjeta de producto ================== */
 
-type ProductCardProps = {
-  p: Product;
-  isFav: boolean;
-  toggleFav: (sku: string) => void;
+function ProductCard({
+  product,
+  onAdd,
+}: {
+  product: Product;
   onAdd: (p: Product) => void;
-};
+}) {
+  const [favorite, setFavorite] = useState(false);
 
-function ProductCard({ p, isFav, toggleFav, onAdd }: ProductCardProps) {
-  const isReserva = p.status === "Reservar (en camino)";
+  // Cargar favorito desde localStorage
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("fav_" + product.id);
+      setFavorite(stored === "1");
+    } catch {
+      // ignorar errores de localStorage
+    }
+  }, [product.id]);
 
-  const handleClick = () => {
-    if (p.status === "Agotado") return;
-    onAdd(p);
+  const toggleFavorite = () => {
+    const next = !favorite;
+    setFavorite(next);
+    try {
+      if (next) localStorage.setItem("fav_" + product.id, "1");
+      else localStorage.removeItem("fav_" + product.id);
+    } catch {
+      // ignorar
+    }
   };
 
-  return (
-    <div className="card" data-sku={p.sku}>
-      {/* Imagen */}
-      <div className="media-block">
-        <div className="img-wrap">{firstImg(p)}</div>
-      </div>
+  const hasFotosExtra = product.imgs && product.imgs.length > 1;
+  const isDisabled = product.status === "agotado";
+  const buttonLabel = product.status === "reserva" ? "Reservar" : "Agregar";
 
-      {/* Contenido */}
-      <div className="card-inner">
-        <div className="sku-center">
-          <div className="sku">{p.sku}</div>
+  const mainImg =
+    product.imgs && product.imgs.length > 0
+      ? product.imgs[0]
+      : "/img/placeholder.png";
+
+  return (
+    <div className="card">
+      {/* Bloque superior (imagen + SKU) */}
+      <div className="media-block">
+        <div className="img-wrap">
+          <Image
+            src={mainImg}
+            alt={product.desc || product.sku}
+            fill
+            sizes="(max-width: 767px) 50vw, 25vw"
+          />
+          {hasFotosExtra && (
+            <span className="photos-chip">{product.imgs.length} fotos</span>
+          )}
         </div>
 
+        <div className="sku-center">
+          <span className="sku">{product.sku}</span>
+        </div>
+      </div>
+
+      {/* Contenido inferior */}
+      <div className="card-inner">
+        {/* Marca + estrella */}
         <div className="brandline">
-          <div className="brand-txt">{p.brand}</div>
+          <span className="brand-txt">{product.brand}</span>
           <button
-            className={isFav ? "fav-btn active" : "fav-btn"}
-            data-sku={p.sku}
-            onClick={(e) => {
-              e.stopPropagation();
-              toggleFav(p.sku);
-            }}
+            type="button"
+            className={`fav-btn ${favorite ? "active" : ""}`}
+            onClick={toggleFavorite}
           >
             ★
           </button>
         </div>
 
-        <div className="desc">{p.desc}</div>
+        <div className="desc">{product.desc}</div>
 
+        {/* Píldora + botón */}
         <div className="card-foot">
-          {pillFor(p.status)}
+          {pillFor(product.status, product.eta)}
 
-          {p.status === "Agotado" ? (
-            <button className="add" style={{ opacity: 0.5 }} disabled>
-              Agotado
-            </button>
-          ) : (
-            <button
-              className="add"
-              data-type={isReserva ? "reserva" : "normal"}
-              onClick={handleClick}
-            >
-              <span className="plus">+</span>
-              {isReserva ? "Reservar" : "Agregar"}
-            </button>
-          )}
+          <button
+            type="button"
+            className={`add ${isDisabled ? "disabled" : ""}`}
+            disabled={isDisabled}
+            onClick={() => onAdd(product)}
+          >
+            <span className="plus">+</span>
+            <span>{buttonLabel}</span>
+          </button>
         </div>
       </div>
     </div>
@@ -190,922 +184,332 @@ function ProductCard({ p, isFav, toggleFav, onAdd }: ProductCardProps) {
 /* ================== Página Cliente ================== */
 
 export default function ClientePage() {
-  const [activeTab, setActiveTab] = useState<"catalog" | "cart" | "orders">(
-    "catalog"
-  );
-  const [activeChip, setActiveChip] = useState<ChipKey>("todo");
-  const [search, setSearch] = useState("");
+  const [activeTab, setActiveTab] = useState<TabKey>("catalog");
+
+  const [chip, setChip] = useState<ChipKey>("todo");
+  const [query, setQuery] = useState("");
+
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
   const [cart, setCart] = useState<CartItem[]>([]);
-  const [toastVisible, setToastVisible] = useState(false);
-  const [toastMessage, setToastMessage] = useState("Agregado");
-  const [alias, setAlias] = useState<string | null>(null);
-  const [favorites, setFavorites] = useState<string[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [expandedOrderId, setExpandedOrderId] = useState<number | null>(null);
 
+  /* ==== Cargar productos desde /api/productos/list ==== */
 
-  // 1 = sólo A, 2 = A+B, 3 = A+B+C
-  const sucursalesActivas: 1 | 2 | 3 = 3;
-
-  /* ===== Alias de usuario (badge) ===== */
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    const load = async () => {
+      try {
+        setLoading(true);
+        setErrorMsg(null);
 
-    const storedAlias =
-      window.localStorage.getItem("kolben_alias") ||
-      window.localStorage.getItem("alias");
+        const res = await fetch("/api/productos/list");
+        const json = await res.json();
 
-    if (storedAlias && storedAlias.trim()) {
-      setAlias(storedAlias.trim());
-    } else {
-      setAlias("N");
-    }
+        // Soporta array directo o { ok, data }
+        const data: Product[] = Array.isArray(json)
+          ? json
+          : Array.isArray(json.data)
+          ? json.data
+          : [];
+
+        setProducts(
+          data.map((p) => ({
+            ...p,
+            eta: (p as any).eta ?? null,
+          }))
+        );
+      } catch (err: any) {
+        console.error("Error cargando productos (cliente):", err);
+        setErrorMsg(err?.message ?? "No se pudieron cargar los productos.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
   }, []);
 
-  /* ===== Favoritos en localStorage ===== */
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const raw = window.localStorage.getItem("kolben_favs");
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) setFavorites(parsed);
-    } catch {
-      // silencioso
-    }
-  }, []);
-
-  const persistFavorites = (next: string[]) => {
-    if (typeof window === "undefined") return;
-    try {
-      window.localStorage.setItem("kolben_favs", JSON.stringify(next));
-    } catch {
-      // ignore
-    }
-  };
-
-  const toggleFavorite = (sku: string) => {
-    setFavorites((prev) => {
-      const exists = prev.includes(sku);
-      const next = exists ? prev.filter((s) => s !== sku) : [...prev, sku];
-      persistFavorites(next);
-      return next;
-    });
-  };
-
-  /* ===== Filtro catálogo ===== */
+  /* ==== Filtro catálogo (chips + buscador) ==== */
 
   const filteredProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    let result = products;
 
-    return sampleProducts.filter((p) => {
-      if (q) {
-        const textMatch =
+    if (chip !== "todo") {
+      if (chip === "favoritos") {
+        // Filtrar por favoritos guardados en localStorage
+        try {
+          result = result.filter((p) => {
+            const stored = localStorage.getItem("fav_" + p.id);
+            return stored === "1";
+          });
+        } catch {
+          result = [];
+        }
+      } else {
+        result = result.filter((p) => p.type === chip);
+      }
+    }
+
+    if (query.trim()) {
+      const q = query.toLowerCase();
+      result = result.filter(
+        (p) =>
           p.sku.toLowerCase().includes(q) ||
           p.brand.toLowerCase().includes(q) ||
-          p.desc.toLowerCase().includes(q);
-        if (!textMatch) return false;
-      }
+          p.desc.toLowerCase().includes(q)
+      );
+    }
 
-      if (activeChip === "favoritos") {
-        return favorites.includes(p.sku);
-      }
+    return result;
+  }, [products, chip, query]);
 
-      // resto de chips, por ahora, se comportan como "Todo"
-      return true;
-    });
-  }, [search, activeChip, favorites]);
-
-  /* ===== Carrito ===== */
+  /* ==== Carrito ==== */
 
   const handleAddToCart = (product: Product) => {
     setCart((prev) => {
-      const idx = prev.findIndex((c) => c.product.sku === product.sku);
-      if (idx === -1) {
-        return [
-          ...prev,
-          {
-            product,
-            qtyA: 1,
-            qtyB: sucursalesActivas >= 2 ? 1 : 0,
-            qtyC: sucursalesActivas >= 3 ? 1 : 0,
-          },
-        ];
+      const existing = prev.find((item) => item.product.id === product.id);
+      if (existing) {
+        return prev.map((item) =>
+          item.product.id === product.id
+            ? { ...item, qtyA: item.qtyA + 1 }
+            : item
+        );
       }
-      const copy = [...prev];
-      copy[idx] = {
-        ...copy[idx],
-        qtyA: copy[idx].qtyA + 1,
-      };
-      return copy;
+      return [
+        ...prev,
+        {
+          product,
+          qtyA: 1,
+          qtyB: 0,
+          qtyC: 0,
+        },
+      ];
     });
-
-  setToastMessage("Agregado");
-  setToastVisible(true);
-  setTimeout(() => setToastVisible(false), 1300);
-
   };
 
-  const handleQtyInputChange = (
-    sku: string,
-    branch: "A" | "B" | "C",
-    value: string
-  ) => {
-    const parsed = parseInt(value, 10);
-    const safe = Number.isNaN(parsed) || parsed < 0 ? 0 : parsed;
-
-    setCart((prev) =>
-      prev.map((item) => {
-        if (item.product.sku !== sku) return item;
-        if (branch === "A") return { ...item, qtyA: safe };
-        if (branch === "B") return { ...item, qtyB: safe };
-        return { ...item, qtyC: safe };
-      })
-    );
+  const handleChangeQty = (productId: string, delta: number) => {
+    setCart((prev) => {
+      return prev
+        .map((item) =>
+          item.product.id === productId
+            ? { ...item, qtyA: Math.max(0, item.qtyA + delta) }
+            : item
+        )
+        .filter((item) => item.qtyA > 0 || item.qtyB > 0 || item.qtyC > 0);
+    });
   };
 
-  const handleRemoveItem = (sku: string) => {
-    setCart((prev) => prev.filter((item) => item.product.sku !== sku));
-  };
+  const totalPiezas = useMemo(
+    () =>
+      cart.reduce(
+        (acc, item) => acc + item.qtyA + item.qtyB + item.qtyC,
+        0
+      ),
+    [cart]
+  );
 
-  const handleClearCart = () => {
+  const handleSendOrder = () => {
+    if (cart.length === 0) return;
+
+    const newOrder: Order = {
+      id: Date.now(),
+      createdAt: new Date().toISOString(),
+      status: "pendiente",
+      items: cart,
+    };
+
+    setOrders((prev) => [newOrder, ...prev]);
     setCart([]);
   };
 
-  const handleLogout = () => {
-    if (typeof window === "undefined") return;
-    window.location.href = "/login";
-  };
-
-const handleSendOrder = () => {
-  if (cart.length === 0) {
-    return;
-  }
-
-  setOrders((prev) => [
-    ...prev,
-    {
-      id: prev.length + 1,
-      items: cart,
-      createdAt: new Date().toISOString(),
-      status: "Pendiente",
-    },
-  ]);
-
-  setCart([]);
-  setActiveTab("orders");
-
-  setToastMessage("Pedido enviado");
-  setToastVisible(true);
-  setTimeout(() => setToastVisible(false), 1300);
-};
-
-
-  const getOrderBranchTotals = (order: Order) => {
-    let totalA = 0;
-    let totalB = 0;
-    let totalC = 0;
-
-    order.items.forEach((item) => {
-      totalA += item.qtyA;
-      totalB += item.qtyB;
-      totalC += item.qtyC;
-    });
-
-    return { totalA, totalB, totalC };
-  };
-
-  const handleEditOrder = (orderId: number) => {
-    const order = orders.find((o) => o.id === orderId);
-    if (!order) return;
-
-    if (order.status !== "Pendiente") {
-      alert(
-        "Este pedido ya está en preparación o enviado y no puede modificarse."
-      );
-      return;
-    }
-
-    setCart(order.items.map((item) => ({ ...item })));
-    setOrders((prev) => prev.filter((o) => o.id !== orderId));
-    setActiveTab("cart");
-  };
-
-  /* ================== Vistas ================== */
+  /* ==== Render de tabs ==== */
 
   const renderCatalogView = () => (
-    <>
-      <div className="chips" id="chips">
-        <button
-          className={`chip ${activeChip === "todo" ? "active" : ""}`}
-          onClick={() => setActiveChip("todo")}
-        >
-          Todo
-        </button>
-        <button
-          className={`chip ${activeChip === "favoritos" ? "active" : ""}`}
-          onClick={() => setActiveChip("favoritos")}
-        >
-          ⭐ Favoritos
-        </button>
-        <button
-          className={`chip ${
-            activeChip === "maestro_frenos" ? "active" : ""
-          }`}
-          onClick={() => setActiveChip("maestro_frenos")}
-        >
-          Maestro frenos
-        </button>
-        <button
-          className={`chip ${
-            activeChip === "maestro_clutch" ? "active" : ""
-          }`}
-          onClick={() => setActiveChip("maestro_clutch")}
-        >
-          Maestro clutch
-        </button>
-        <button
-          className={`chip ${
-            activeChip === "auxiliar_frenos" ? "active" : ""
-          }`}
-          onClick={() => setActiveChip("auxiliar_frenos")}
-        >
-          Auxiliar frenos
-        </button>
-        <button
-          className={`chip ${
-            activeChip === "auxiliar_clutch" ? "active" : ""
-          }`}
-          onClick={() => setActiveChip("auxiliar_clutch")}
-        >
-          Auxiliar clutch
-        </button>
-        <button
-          className={`chip ${
-            activeChip === "pastillas_freno" ? "active" : ""
-          }`}
-          onClick={() => setActiveChip("pastillas_freno")}
-        >
-          Pastillas frenos
-        </button>
+    <section className="panel">
+      {/* Chips de filtro */}
+      <div className="chips">
+        {CHIPS.map((c) => (
+          <button
+            key={c.key}
+            type="button"
+            className={`chip ${chip === c.key ? "active" : ""}`}
+            onClick={() => setChip(c.key)}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
 
+      {/* Buscador */}
       <div className="row">
         <input
-          id="q"
-          placeholder="Buscar por código, descripción o marca"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          type="text"
+          placeholder="Buscar por código, marca, modelo..."
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
         />
-        <button className="btn light" onClick={() => setSearch("")}>
+        <button
+          type="button"
+          className="btn light"
+          onClick={() => setQuery("")}
+        >
           Limpiar
         </button>
       </div>
 
-      <div className="grid" id="grid">
-        {filteredProducts.map((p) => (
-          <ProductCard
-            key={p.sku}
-            p={p}
-            onAdd={handleAddToCart}
-            isFav={favorites.includes(p.sku)}
-            toggleFav={toggleFavorite}
-          />
-        ))}
+      {/* Mensajes de estado */}
+      {loading && (
+        <div style={{ padding: "12px 0" }}>Cargando productos…</div>
+      )}
+
+      {errorMsg && !loading && (
+        <div style={{ padding: "12px 0", color: "#b91c1c" }}>{errorMsg}</div>
+      )}
+
+      {!loading && !errorMsg && filteredProducts.length === 0 && (
+        <div style={{ padding: "12px 0" }}>
+          No hay productos que coincidan con el filtro.
+        </div>
+      )}
+
+      {/* Grid de productos */}
+      <div data-kolben>
+        <div className="grid">
+          {filteredProducts.map((p) => (
+            <ProductCard
+              key={p.id}
+              product={p}
+              onAdd={handleAddToCart}
+            />
+          ))}
+        </div>
       </div>
-    </>
+    </section>
   );
 
-  const renderCartView = () => {
-    const totalCols =
-      8 +
-      (sucursalesActivas >= 2 ? 1 : 0) +
-      (sucursalesActivas >= 3 ? 1 : 0);
-
-    return (
-      <>
-        <h1 style={{ marginBottom: 16 }}>Carrito</h1>
-
-        {/* Banda azul igual al carrito admin */}
-        <div
-          style={{
-            padding: "12px 24px",
-            marginBottom: 20,
-            borderRadius: 14,
-            background: "#EBF5FF",
-            fontSize: 14,
-          }}
-        >
-          Agrega tus productos con calma, tu carrito los guardará
-          automáticamente.
+  const renderCartView = () => (
+    <section className="panel">
+      {cart.length === 0 ? (
+        <div style={{ padding: "12px 0" }}>
+          Tu carrito está vacío. Agrega productos desde el catálogo.
         </div>
+      ) : (
+        <>
+          <div className="cart-list">
+            {cart.map((item) => (
+              <div className="cart-item" key={item.product.id}>
+                <div className="cart-item-main">
+                  <span className="cart-item-title">
+                    {item.product.sku}
+                  </span>
+                  <span className="cart-item-meta">
+                    {item.product.brand} · {item.product.desc}
+                  </span>
+                </div>
 
-        {/* ============================
-            Escritorio / tablet (PC)
-            ============================ */}
-        <div className="desktop-only">
-          <div className="table-wrap">
-            <table className="table">
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Código</th>
-                  <th>Descripción</th>
-                  <th>Estado</th>
-                  <th>ETA</th>
-                  <th>Tipo</th>
-                  <th>Cantidad sucursal A</th>
-                  {sucursalesActivas >= 2 && (
-                    <th>Cantidad sucursal B</th>
-                  )}
-                  {sucursalesActivas >= 3 && (
-                    <th>Cantidad sucursal C</th>
-                  )}
-                  <th>Acción</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {cart.length === 0 ? (
-                  <tr>
-                    <td colSpan={totalCols} style={{ textAlign: "center" }}>
-                      Tu carrito está vacío. Agrega productos desde el
-                      catálogo.
-                    </td>
-                  </tr>
-                ) : (
-                  cart.map((item, index) => {
-                    const isReserva =
-                      item.product.status === "Reservar (en camino)";
-                    const tipo = isReserva ? "reserva" : "normal";
-                    const etaText = isReserva ? "25 Enero" : "-";
-
-                    return (
-                      <tr key={item.product.sku}>
-                        <td>{index + 1}</td>
-                        <td>{item.product.sku}</td>
-                        <td>{item.product.desc}</td>
-                        <td>
-                          <div className="cart-card-estado">
-                            {pillFor(item.product.status)}
-                          </div>
-                        </td>
-                        <td>{etaText}</td>
-                        <td>{tipo}</td>
-                        <td>
-                          <input
-                            type="number"
-                            min={0}
-                            value={item.qtyA}
-                            onChange={(e) =>
-                              handleQtyInputChange(
-                                item.product.sku,
-                                "A",
-                                e.target.value
-                              )
-                            }
-                            style={{ width: 60 }}
-                          />
-                        </td>
-                        {sucursalesActivas >= 2 && (
-                          <td>
-                            <input
-                              type="number"
-                              min={0}
-                              value={item.qtyB}
-                              onChange={(e) =>
-                                handleQtyInputChange(
-                                  item.product.sku,
-                                  "B",
-                                  e.target.value
-                                )
-                              }
-                              style={{ width: 60 }}
-                            />
-                          </td>
-                        )}
-                        {sucursalesActivas >= 3 && (
-                          <td>
-                            <input
-                              type="number"
-                              min={0}
-                              value={item.qtyC}
-                              onChange={(e) =>
-                                handleQtyInputChange(
-                                  item.product.sku,
-                                  "C",
-                                  e.target.value
-                                )
-                              }
-                              style={{ width: 60 }}
-                            />
-                          </td>
-                        )}
-                        <td>
-                          <button
-                            className="btn-ghost"
-                            onClick={() =>
-                              handleRemoveItem(item.product.sku)
-                            }
-                          >
-                            Quitar
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {cart.length > 0 && (
-            <div
-              className="row"
-              style={{ justifyContent: "space-between", marginTop: 16 }}
-            >
-              <button
-                className="btn-ghost"
-                onClick={() => setActiveTab("catalog")}
-              >
-                Catálogo
-              </button>
-              <button
-                className="btn primary"
-                onClick={handleSendOrder}
-              >
-                Enviar orden
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* ============================
-            Móvil: mantiene layout cards
-            ============================ */}
-        <div className="mobile-only">
-          <div className="cart-cards">
-            {cart.length === 0 ? (
-              <div className="cart-card cart-card-empty">
-                <div>Tu carrito está vacío.</div>
-                <div>Agrega productos desde el catálogo.</div>
+                <div className="cart-qty">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleChangeQty(item.product.id, -1)
+                    }
+                  >
+                    −
+                  </button>
+                  <span>{item.qtyA}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleChangeQty(item.product.id, 1)
+                    }
+                  >
+                    +
+                  </button>
+                </div>
               </div>
-            ) : (
-              cart.map((item, index) => (
-                <article key={item.product.sku} className="cart-card">
-                  <header className="cart-card-head">
-                    <div className="cart-card-code">
-                      {index + 1}. {item.product.sku}
-                    </div>
-                    <div className="cart-card-estado">
-                      {pillFor(item.product.status)}
-                    </div>
-                  </header>
-
-                  <div className="cart-card-desc">
-                    {item.product.desc}
-                  </div>
-
-                  {/* Cantidad sucursal A */}
-                  <div className="cart-card-qty-row">
-                    <span className="qty-label">Cantidad sucursal A</span>
-                    <input
-                      className="qty-input"
-                      type="number"
-                      min={0}
-                      value={item.qtyA}
-                      onChange={(e) =>
-                        handleQtyInputChange(
-                          item.product.sku,
-                          "A",
-                          e.target.value
-                        )
-                      }
-                    />
-                  </div>
-
-                  {/* Cantidad sucursal B */}
-                  {sucursalesActivas >= 2 && (
-                    <div className="cart-card-qty-row">
-                      <span className="qty-label">Cantidad sucursal B</span>
-                      <input
-                        className="qty-input"
-                        type="number"
-                        min={0}
-                        value={item.qtyB}
-                        onChange={(e) =>
-                          handleQtyInputChange(
-                            item.product.sku,
-                            "B",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  )}
-
-                  {/* Cantidad sucursal C */}
-                  {sucursalesActivas >= 3 && (
-                    <div className="cart-card-qty-row">
-                      <span className="qty-label">Cantidad sucursal C</span>
-                      <input
-                        className="qty-input"
-                        type="number"
-                        min={0}
-                        value={item.qtyC}
-                        onChange={(e) =>
-                          handleQtyInputChange(
-                            item.product.sku,
-                            "C",
-                            e.target.value
-                          )
-                        }
-                      />
-                    </div>
-                  )}
-
-                  <div className="cart-card-actions">
-                    <button
-                      className="btn-ghost"
-                      onClick={() =>
-                        handleRemoveItem(item.product.sku)
-                      }
-                    >
-                      Quitar
-                    </button>
-                  </div>
-                </article>
-              ))
-            )}
+            ))}
           </div>
 
-          {cart.length > 0 && (
-            <div
-              className="row"
-              style={{ justifyContent: "space-between" }}
-            >
-              <button
-                className="btn-ghost"
-                onClick={handleSendOrder}
-              >
-                Catálogo
-              </button>
-              <button
-                className="btn primary"
-                onClick={handleSendOrder}
-              >
-                Enviar orden
-              </button>
-            </div>
-          )}
-        </div>
-      </>
-    );
-  };
+          <div className="cart-total">
+            Total piezas: {totalPiezas}
+          </div>
 
-  /* ========= NUEVA VISTA DE PEDIDOS (cliente) =========
-     Copiamos el layout visual del admin: título + orders-grid
-     con tarjetas .panel casi idénticas. El cliente ve el status
-     pero NO lo puede cambiar (select deshabilitado).          */
+          <div className="mt-12" style={{ textAlign: "right" }}>
+            <button
+              type="button"
+              className="btn"
+              onClick={handleSendOrder}
+            >
+              Enviar pedido (demo)
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
 
   const renderOrdersView = () => (
-    <>
-      <h1 style={{ marginBottom: 20 }}>Pedidos</h1>
-
-      {orders.length === 0 && (
-        <div className="panel" style={{ padding: 24, textAlign: "center" }}>
-          Aún no has enviado pedidos.
+    <section className="panel">
+      {orders.length === 0 ? (
+        <div style={{ padding: "12px 0" }}>
+          Aún no tienes pedidos registrados en esta sesión.
         </div>
-      )}
-
-      <div className="orders-grid">
-        {orders.map((order) => {
-          const { totalA, totalB, totalC } = getOrderBranchTotals(order);
-
-          const fechaTexto = new Date(order.createdAt).toLocaleString("es-HN", {
-            day: "2-digit",
-            month: "2-digit",
-            year: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-            second: "2-digit",
-            hour12: true,
-          });
-
-          const puedeEditar = order.status === "Pendiente";
-          const isExpanded = expandedOrderId === order.id;
-
-          return (
-            <div
-              key={order.id}
-              className="panel"
-              style={{
-                padding: 24,
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-              }}
-            >
-              {/* ==== CABECERA SUPERIOR (igual admin) ==== */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: 16,
-                  gap: 16,
-                }}
-              >
-                {/* Lado izquierdo: fecha + código + totales */}
-                <div>
-                  <div
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginBottom: 8,
-                      fontSize: 13,
-                      color: "#4b5563",
-                    }}
-                  >
-                    <span
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        backgroundColor: "#f3f4ff",
-                        border: "1px solid #e5e7eb",
-                      }}
-                    >
-                      {fechaTexto}
-                    </span>
-
-                    <span
-                      style={{
-                        padding: "4px 10px",
-                        borderRadius: 999,
-                        backgroundColor: "#f9fafb",
-                        border: "1px solid #e5e7eb",
-                        fontWeight: 500,
-                      }}
-                    >
-                      PC
-                    </span>
-                  </div>
-
-                  <h2 style={{ margin: 0, marginBottom: 4 }}>
-                    {`ORD-${String(order.id).toString().padStart(3, "0")}`}
-                  </h2>
-
-                  <div
-                    style={{
-                      fontSize: 14,
-                      color: "#4b5563",
-                      marginBottom: 2,
-                    }}
-                  >
-                    Ítems{" "}
-                    <span style={{ fontWeight: 600 }}>
-                      {order.items.length}
-                    </span>
-                  </div>
-
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "#6b7280",
-                      marginTop: 2,
-                    }}
-                  >
-                    A: {totalA}
-                    {sucursalesActivas >= 2 && <> · B: {totalB}</>}
-                    {sucursalesActivas >= 3 && <> · C: {totalC}</>}
-                  </div>
-                </div>
-
-                {/* Lado derecho: Status (solo lectura) */}
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    alignItems: "flex-end",
-                    gap: 8,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 13,
-                      color: "#6b7280",
-                      marginBottom: 2,
-                    }}
-                  >
-                    Status
-                  </span>
-                  <select
-                    value={order.status}
-                    disabled
-                    style={{
-                      padding: "6px 12px",
-                      minWidth: 140,
-                      fontSize: 14,
-                      borderRadius: 999,
-                      border: "1px solid #e5e7eb",
-                      background: "#f9fafb",
-                      color: "#111827",
-                    }}
-                  >
-                    <option value="Pendiente">Pendiente</option>
-                    <option value="Preparando">Preparando</option>
-                    <option value="Enviado">Enviado</option>
-                  </select>
-                </div>
+      ) : (
+        <div className="orders-list">
+          {orders.map((order) => (
+            <div className="order-item" key={order.id}>
+              <div className="cart-item-main">
+                <span className="cart-item-title">
+                  Pedido #{order.id}
+                </span>
+                <span className="cart-item-meta">
+                  {new Date(order.createdAt).toLocaleString()} ·{" "}
+                  {order.items.length} productos
+                </span>
               </div>
-
-              {/* ==== BOTONES ==== */}
-              <div
-                style={{
-                  display: "flex",
-                  gap: 12,
-                  marginBottom: 16,
-                  alignItems: "center",
-                  flexWrap: "wrap",
-                }}
-              >
-                {/* PDF */}
-                <button
-                  type="button"
-                  className="btn light"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 999,
-                    fontSize: 14,
-                  }}
-                >
-                  PDF
-                </button>
-
-                {/* Ver detalle (plegable) */}
-                <button
-                  type="button"
-                  className="btn light"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 999,
-                    fontSize: 14,
-                  }}
-                  onClick={() =>
-                    setExpandedOrderId(isExpanded ? null : order.id)
-                  }
-                >
-                  {isExpanded ? "Ocultar detalle" : "Ver detalle"}
-                </button>
-
-                {/* Editar pedido */}
-                <button
-                  type="button"
-                  className="btn primary"
-                  style={{
-                    padding: "8px 20px",
-                    borderRadius: 999,
-                    fontSize: 14,
-                  }}
-                  onClick={() => handleEditOrder(order.id)}
-                  disabled={!puedeEditar}
-                >
-                  Editar pedido
-                </button>
-              </div>
-
-              {/* ==== DETALLE PLEGABLE ==== */}
-              {isExpanded && (
-                <div className="table-wrap" style={{ marginTop: 8 }}>
-                  <table className="table">
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Código</th>
-                        <th>Descripción</th>
-                        <th>A</th>
-                        {sucursalesActivas >= 2 && <th>B</th>}
-                        {sucursalesActivas >= 3 && <th>C</th>}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {order.items.map((item, index) => (
-                        <tr key={item.product.sku}>
-                          <td>{index + 1}</td>
-                          <td>{item.product.sku}</td>
-                          <td>{item.product.desc}</td>
-                          <td>{item.qtyA}</td>
-                          {sucursalesActivas >= 2 && <td>{item.qtyB}</td>}
-                          {sucursalesActivas >= 3 && <td>{item.qtyC}</td>}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {/* ==== NOTA FINAL ==== */}
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 13,
-                  color: "#6b7280",
-                }}
-              >
-                Solo puedes editar mientras el pedido esté{" "}
-                <strong>Pendiente</strong>.
+              <div className="cart-qty">
+                <span>{order.status}</span>
               </div>
             </div>
-          );
-        })}
-      </div>
-    </>
+          ))}
+        </div>
+      )}
+    </section>
   );
 
-
-  /* ================== Render root ================== */
-
   return (
-    <div data-kolben="catalog">
-      <header>
-        <div className="container topbar">
-          <div className="brand-wrap">
-            <button className="brand-btn" id="homeLink" title="Inicio">
-              <img
-                id="logoImg"
-                className="brand-img"
-                alt="KOLBEN"
-                src="/kolben-logo.png"
-              />
-            </button>
+    <div className="cliente-container">
+      {/* Tabs superiores (internas del cliente) */}
+      <div className="cliente-tabs">
+        <button
+          type="button"
+          className={activeTab === "catalog" ? "active" : ""}
+          onClick={() => setActiveTab("catalog")}
+        >
+          Catálogo
+        </button>
+        <button
+          type="button"
+          className={activeTab === "cart" ? "active" : ""}
+          onClick={() => setActiveTab("cart")}
+        >
+          Carrito ({cart.length})
+        </button>
+        <button
+          type="button"
+          className={activeTab === "orders" ? "active" : ""}
+          onClick={() => setActiveTab("orders")}
+        >
+          Pedidos
+        </button>
+      </div>
 
-            <div id="logoEditWrap">
-              <input
-                type="file"
-                id="logoFile"
-                accept="image/*"
-                style={{ display: "none" }}
-              />
-              <button id="logoEditBtn">Editar logo</button>
-            </div>
-          </div>
-
-          <div className="right" id="sessionBox">
-            {alias && (
-              <span className="badge-user" title={alias}>
-                {alias}
-              </span>
-            )}
-
-            <button className="btn-ghost" onClick={handleLogout}>
-              Salir
-            </button>
-          </div>
-
-          <nav id="tabs">
-            <button
-              className={`tab ${activeTab === "catalog" ? "active" : ""}`}
-              onClick={() => setActiveTab("catalog")}
-            >
-              Catálogo
-            </button>
-            <button
-              className={`tab ${activeTab === "cart" ? "active" : ""}`}
-              onClick={() => setActiveTab("cart")}
-            >
-              Carrito
-            </button>
-            <button
-              className={`tab ${activeTab === "orders" ? "active" : ""}`}
-              onClick={() => setActiveTab("orders")}
-            >
-              Pedidos
-            </button>
-          </nav>
-        </div>
-      </header>
-
-      <main>
-        {/* OJO: aquí ya NO hay panel envolviendo pedidos.
-            Así imitamos el layout del admin: 
-            - Catálogo y Carrito dentro de panel
-            - Pedidos igual que en admin (cards sueltas) */}
-        <div className="container" style={{ paddingTop: 24 }}>
-          {activeTab === "catalog" && (
-            <div className="panel">{renderCatalogView()}</div>
-          )}
-      {activeTab === "cart" && (
-        <div className="panel">{renderCartView()}</div>
-      )}
+      {/* Contenido de cada tab */}
+      {activeTab === "catalog" && renderCatalogView()}
+      {activeTab === "cart" && renderCartView()}
       {activeTab === "orders" && renderOrdersView()}
     </div>
-  </main>
-
-  <div id="toast" className={`toast ${toastVisible ? "show" : ""}`}>
-    {toastMessage}
-  </div>
-</div>
-);
+  );
 }
-

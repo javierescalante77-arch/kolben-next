@@ -1,18 +1,9 @@
-// app/api/pedidos/create/route.ts
-import { NextResponse } from "next/server";
-import prisma from "@/lib/prisma";
+import { prisma } from "@/lib/prisma";
+
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const { clienteId, items } = body;
-
-    if (!clienteId || !Array.isArray(items) || items.length === 0) {
-      return NextResponse.json(
-        { ok: false, error: "Datos de pedido inválidos" },
-        { status: 400 }
-      );
-    }
+    const { clienteId, items } = await req.json();
 
     const pedido = await prisma.pedido.create({
       data: {
@@ -20,29 +11,24 @@ export async function POST(req: Request) {
         estado: "PENDIENTE",
         items: {
           create: items.map((item: any) => ({
-            codigo: item.codigo,
-            descripcion: item.descripcion,
-            sucursalA: item.sucursalA ?? 0,
-            sucursalB: item.sucursalB ?? 0,
-            sucursalC: item.sucursalC ?? 0,
-            tipo: item.tipo ?? "normal",
-            estadoProd: item.estadoProd ?? null,
-            eta: item.eta ?? null,
+            productoId: item.productoId,  // 👈 OBLIGATORIO
+            cantidadA: item.cantidadA ?? 0,
+            cantidadB: item.cantidadB ?? 0,
+            cantidadC: item.cantidadC ?? 0,
+            tipo: item.tipo ?? "NORMAL",
+
+            // Guardamos snapshot de estado/ETA del producto (opcional)
+            estadoTexto: item.estadoTexto ?? null,
+            etaTexto: item.etaTexto ?? null,
           })),
         },
       },
-      include: {
-        items: true,
-        cliente: true,
-      },
+      include: { items: true }
     });
 
-    return NextResponse.json({ ok: true, pedido });
-  } catch (error) {
-    console.error("Error creando pedido", error);
-    return NextResponse.json(
-      { ok: false, error: "Error interno al crear el pedido" },
-      { status: 500 }
-    );
+    return Response.json({ ok: true, data: pedido });
+  } catch (err) {
+    console.error("Error creando pedido:", err);
+    return Response.json({ ok: false, error: "Error creando pedido" }, { status: 500 });
   }
 }

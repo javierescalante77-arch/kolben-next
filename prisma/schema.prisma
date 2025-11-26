@@ -1,14 +1,16 @@
 // prisma/schema.prisma
 
-// 1) DATASOURCE: conecta Prisma con Neon (la URL viene de prisma.config.ts)
+// 1) DATASOURCE: conecta Prisma con Neon usando .env
 datasource db {
   provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // 2) GENERATOR: genera el cliente de Prisma
 generator client {
   provider = "prisma-client-js"
 }
+
 
 /// Estado de disponibilidad del producto en catálogo
 enum EstadoProducto {
@@ -59,7 +61,7 @@ model Cliente {
   pedidos    Pedido[]
 
   createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
+  updatedAt  DateTime  @default(now()) @updatedAt
 }
 
 /// Productos Kolben
@@ -83,7 +85,7 @@ model Producto {
   items       PedidoItem[]
 
   createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
+  updatedAt  DateTime  @default(now()) @updatedAt
 }
 
 /// Pedido de un cliente (carrito enviado)
@@ -100,7 +102,7 @@ model Pedido {
   items      PedidoItem[]
 
   createdAt  DateTime      @default(now())
-  updatedAt  DateTime      @updatedAt
+  updatedAt  DateTime  @default(now()) @updatedAt
 }
 
 /// Línea individual de un pedido
