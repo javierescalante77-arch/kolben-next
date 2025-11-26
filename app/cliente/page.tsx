@@ -72,7 +72,7 @@ const CHIPS: { key: ChipKey; label: string }[] = [
   { key: "pastillas_freno", label: "Pastillas de freno" },
 ];
 
-/* ================== Helpers visuales ================== */
+/* ================== Helpers visuales y de mapeo ================== */
 
 function pillFor(status: ProductStatus, eta?: string | null) {
   switch (status) {
@@ -91,6 +91,66 @@ function pillFor(status: ProductStatus, eta?: string | null) {
   }
 }
 
+function labelForStatus(status: ProductStatus, eta?: string | null): string {
+  switch (status) {
+    case "disponible":
+      return "Disponible";
+    case "bajo":
+      return "Bajo stock";
+    case "agotado":
+      return "Agotado";
+    case "reserva":
+      return eta && eta.trim() ? `En camino · ${eta}` : "En camino";
+    default:
+      return "";
+  }
+}
+
+function mapEstadoProductoApi(estado?: string | null): ProductStatus {
+  switch (estado) {
+    case "DISPONIBLE":
+      return "disponible";
+    case "BAJO_STOCK":
+      return "bajo";
+    case "AGOTADO":
+      return "agotado";
+    case "RESERVA":
+      return "reserva";
+    default:
+      return "disponible";
+  }
+}
+
+function mapTipoProductoApi(tipo?: string | null): ProductType {
+  switch (tipo) {
+    case "MAESTRO_FRENOS":
+      return "maestro_frenos";
+    case "MAESTRO_CLUTCH":
+      return "maestro_clutch";
+    case "AUXILIAR_FRENOS":
+      return "auxiliar_frenos";
+    case "AUXILIAR_CLUTCH":
+      return "auxiliar_clutch";
+    case "PASTILLAS_FRENO":
+      return "pastillas_freno";
+    default:
+      return "maestro_frenos";
+  }
+}
+
+function labelEstadoPedido(status: OrderStatus): string {
+  switch (status) {
+    case "pendiente":
+      return "Pendiente";
+    case "preparando":
+      return "Preparando";
+    case "enviado":
+      return "Enviado";
+    default:
+      return status;
+  }
+}
+
 /* ================== Tarjeta de producto ================== */
 
 function ProductCard({
@@ -102,7 +162,6 @@ function ProductCard({
 }) {
   const [favorite, setFavorite] = useState(false);
 
-  // Cargar favorito desde localStorage
   useEffect(() => {
     try {
       const stored = localStorage.getItem("fav_" + product.id);
@@ -134,7 +193,6 @@ function ProductCard({
 
   return (
     <div className="card">
-      {/* Bloque superior (imagen + SKU) */}
       <div className="media-block">
         <div className="img-wrap">
           <Image
@@ -153,9 +211,7 @@ function ProductCard({
         </div>
       </div>
 
-      {/* Contenido inferior */}
       <div className="card-inner">
-        {/* Marca + estrella */}
         <div className="brandline">
           <span className="brand-txt">{product.brand}</span>
           <button
@@ -169,7 +225,6 @@ function ProductCard({
 
         <div className="desc">{product.desc}</div>
 
-        {/* Píldora + botón */}
         <div className="card-foot">
           {pillFor(product.status, product.eta)}
 
@@ -201,14 +256,19 @@ export default function ClientePage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [cart, setCart] = useState<CartItem[]>([]);
+
   const [orders, setOrders] = useState<Order[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
+
+  const [sending, setSending] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
 
   // Cliente actual + sucursales
   const [cliente, setCliente] = useState<ClienteLite | null>(null);
   const [clienteLoading, setClienteLoading] = useState(false);
   const [clienteError, setClienteError] = useState<string | null>(null);
 
-  // Si no hay cliente aún, por defecto 3 sucursales (modo demo seguro)
   const sucursalesActivas: 1 | 2 | 3 =
     (cliente?.sucursales as 1 | 2 | 3) ?? 3;
 
@@ -223,7 +283,6 @@ export default function ClientePage() {
         const res = await fetch("/api/productos/list");
         const json = await res.json();
 
-        // Soporta array directo o { ok, data }
         const data: Product[] = Array.isArray(json)
           ? json
           : Array.isArray(json.data)
@@ -289,6 +348,89 @@ export default function ClientePage() {
     loadClienteActual();
   }, []);
 
+  /* ==== Cargar pedidos reales desde /api/pedidos/list ==== */
+
+  async function loadOrdersForCliente(clienteId: number) {
+    try {
+      setOrdersLoading(true);
+      setOrdersError(null);
+
+      const res = await fetch("/api/pedidos/list");
+      const json = await res.json();
+
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "Error listando pedidos");
+      }
+
+      const data = (json.data || []) as any[];
+
+      const propios = data.filter(
+        (p) =>
+          p.clienteId === clienteId ||
+          p.cliente?.id === clienteId
+      );
+
+      const mapped: Order[] = propios.map((p) => {
+        const items: CartItem[] = (p.items || []).map((it: any) => {
+          const prod = it.product || {};
+          const status = mapEstadoProductoApi(prod.estado);
+          const eta: string | null =
+            (it.etaTexto as string | null) ??
+            (prod.eta as string | null) ??
+            null;
+
+          const product: Product = {
+            id: String(prod.id ?? it.productId ?? "0"),
+            sku: String(prod.sku ?? ""),
+            brand: String(prod.marca ?? ""),
+            desc: String(prod.descripcion ?? ""),
+            status,
+            type: mapTipoProductoApi(prod.tipo),
+            imgs: Array.isArray(prod.imagenes) ? prod.imagenes : [],
+            eta,
+          };
+
+          return {
+            product,
+            qtyA: it.cantidadA ?? 0,
+            qtyB: it.cantidadB ?? 0,
+            qtyC: it.cantidadC ?? 0,
+          };
+        });
+
+        const estadoApi: string =
+          typeof p.estado === "string" ? p.estado.toLowerCase() : "pendiente";
+
+        const status: OrderStatus =
+          estadoApi === "preparando"
+            ? "preparando"
+            : estadoApi === "enviado"
+            ? "enviado"
+            : "pendiente";
+
+        return {
+          id: p.id,
+          createdAt: p.createdAt,
+          status,
+          items,
+        };
+      });
+
+      setOrders(mapped);
+    } catch (err: any) {
+      console.error("Error cargando pedidos (cliente):", err);
+      setOrdersError(err.message || "Error al cargar los pedidos.");
+      setOrders([]);
+    } finally {
+      setOrdersLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!cliente) return;
+    void loadOrdersForCliente(cliente.id);
+  }, [cliente]);
+
   /* ==== Filtro catálogo (chips + buscador) ==== */
 
   const filteredProducts = useMemo(() => {
@@ -296,7 +438,6 @@ export default function ClientePage() {
 
     if (chip !== "todo") {
       if (chip === "favoritos") {
-        // Filtrar por favoritos guardados en localStorage
         try {
           result = result.filter((p) => {
             const stored = localStorage.getItem("fav_" + p.id);
@@ -329,7 +470,6 @@ export default function ClientePage() {
     setCart((prev) => {
       const existing = prev.find((item) => item.product.id === product.id);
       if (existing) {
-        // Suma 1 a sucursal A por defecto
         return prev.map((item) =>
           item.product.id === product.id
             ? { ...item, qtyA: item.qtyA + 1 }
@@ -368,7 +508,6 @@ export default function ClientePage() {
         return updated;
       });
 
-      // Eliminar líneas totalmente en 0
       return next.filter(
         (item) => item.qtyA > 0 || item.qtyB > 0 || item.qtyC > 0
       );
@@ -384,33 +523,78 @@ export default function ClientePage() {
     [cart]
   );
 
-  const handleSendOrder = () => {
-    if (cart.length === 0) return;
+  /* ==== Enviar pedido REAL a /api/pedidos/create ==== */
 
-    // Ajustar cantidades según sucursales activas
-    const sanitizedItems: CartItem[] = cart.map((item) => ({
-      ...item,
-      qtyA: sucursalesActivas >= 1 ? item.qtyA : 0,
-      qtyB: sucursalesActivas >= 2 ? item.qtyB : 0,
-      qtyC: sucursalesActivas >= 3 ? item.qtyC : 0,
-    }));
+  const handleSendOrder = async () => {
+    try {
+      setSendError(null);
 
-    const newOrder: Order = {
-      id: Date.now(),
-      createdAt: new Date().toISOString(),
-      status: "pendiente",
-      items: sanitizedItems,
-    };
+      if (cart.length === 0) {
+        setSendError("Tu carrito está vacío.");
+        return;
+      }
 
-    setOrders((prev) => [newOrder, ...prev]);
-    setCart([]);
+      const sanitizedItems: CartItem[] = cart.map((item) => ({
+        ...item,
+        qtyA: sucursalesActivas >= 1 ? item.qtyA : 0,
+        qtyB: sucursalesActivas >= 2 ? item.qtyB : 0,
+        qtyC: sucursalesActivas >= 3 ? item.qtyC : 0,
+      }));
+
+      const hasPiezas = sanitizedItems.some(
+        (it) => it.qtyA > 0 || it.qtyB > 0 || it.qtyC > 0
+      );
+
+      if (!hasPiezas) {
+        setSendError("Debes ingresar al menos una pieza en alguna sucursal.");
+        return;
+      }
+
+      setSending(true);
+
+      const payload = {
+        clienteId: cliente?.id,
+        dispositivo: "cliente-web",
+        items: sanitizedItems.map((it) => ({
+          sku: it.product.sku,
+          cantidadA: it.qtyA,
+          cantidadB: it.qtyB,
+          cantidadC: it.qtyC,
+          tipo: it.product.status === "reserva" ? "RESERVA" : "NORMAL",
+          estadoTexto: labelForStatus(it.product.status, it.product.eta),
+          etaTexto: it.product.eta ?? null,
+        })),
+      };
+
+      const res = await fetch("/api/pedidos/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok || !json.ok) {
+        throw new Error(json.error || "Error al enviar el pedido.");
+      }
+
+      setCart([]);
+      if (cliente?.id) {
+        await loadOrdersForCliente(cliente.id);
+      }
+      setActiveTab("orders");
+    } catch (err: any) {
+      console.error("Error enviando pedido:", err);
+      setSendError(err.message || "Error al enviar el pedido.");
+    } finally {
+      setSending(false);
+    }
   };
 
   /* ==== Render de tabs ==== */
 
   const renderCatalogView = () => (
     <section className="panel">
-      {/* Chips de filtro */}
       <div className="chips">
         {CHIPS.map((c) => (
           <button
@@ -424,7 +608,6 @@ export default function ClientePage() {
         ))}
       </div>
 
-      {/* Buscador */}
       <div className="row">
         <input
           type="text"
@@ -441,7 +624,6 @@ export default function ClientePage() {
         </button>
       </div>
 
-      {/* Mensajes de estado */}
       {loading && (
         <div style={{ padding: "12px 0" }}>Cargando productos…</div>
       )}
@@ -456,7 +638,6 @@ export default function ClientePage() {
         </div>
       )}
 
-      {/* Grid de productos */}
       <div data-kolben>
         <div className="grid">
           {filteredProducts.map((p) => (
@@ -469,7 +650,6 @@ export default function ClientePage() {
 
   const renderCartView = () => (
     <section className="panel">
-      {/* Info de cliente y sucursales */}
       <div
         style={{
           marginBottom: 12,
@@ -550,7 +730,7 @@ export default function ClientePage() {
                           width: 72,
                           padding: "4px 6px",
                           borderRadius: 6,
-                          border: "1px solid #d1d5db",
+                          border: "1px solid "#d1d5db"",
                           fontSize: 14,
                         }}
                       />
@@ -583,7 +763,7 @@ export default function ClientePage() {
                           width: 72,
                           padding: "4px 6px",
                           borderRadius: 6,
-                          border: "1px solid #d1d5db",
+                          border: "1px solid "#d1d5db"",
                           fontSize: 14,
                         }}
                       />
@@ -616,7 +796,7 @@ export default function ClientePage() {
                           width: 72,
                           padding: "4px 6px",
                           borderRadius: 6,
-                          border: "1px solid #d1d5db",
+                          border: "1px solid "#d1d5db"",
                           fontSize: 14,
                         }}
                       />
@@ -629,13 +809,26 @@ export default function ClientePage() {
 
           <div className="cart-total">Total piezas: {totalPiezas}</div>
 
+          {sendError && (
+            <div
+              style={{
+                marginTop: 8,
+                fontSize: 13,
+                color: "#b91c1c",
+              }}
+            >
+              {sendError}
+            </div>
+          )}
+
           <div className="mt-12" style={{ textAlign: "right" }}>
             <button
               type="button"
               className="btn"
               onClick={handleSendOrder}
+              disabled={sending}
             >
-              Enviar pedido (demo)
+              {sending ? "Enviando pedido…" : "Enviar pedido"}
             </button>
           </div>
         </>
@@ -645,28 +838,61 @@ export default function ClientePage() {
 
   const renderOrdersView = () => (
     <section className="panel">
-      {orders.length === 0 ? (
-        <div style={{ padding: "12px 0" }}>
-          Aún no tienes pedidos registrados en esta sesión.
+      {cliente && (
+        <div
+          style={{
+            marginBottom: 12,
+            fontSize: 13,
+            color: "#4b5563",
+          }}
+        >
+          Pedidos de{" "}
+          <strong>
+            {cliente.nombre} ({cliente.codigo})
+          </strong>
         </div>
-      ) : (
+      )}
+
+      {ordersLoading && (
+        <div style={{ padding: "12px 0" }}>Cargando pedidos…</div>
+      )}
+
+      {ordersError && !ordersLoading && (
+        <div style={{ padding: "12px 0", color: "#b91c1c" }}>
+          {ordersError}
+        </div>
+      )}
+
+      {!ordersLoading && !ordersError && orders.length === 0 && (
+        <div style={{ padding: "12px 0" }}>
+          Aún no tienes pedidos registrados.
+        </div>
+      )}
+
+      {orders.length > 0 && (
         <div className="orders-list">
-          {orders.map((order) => (
-            <div className="order-item" key={order.id}>
-              <div className="cart-item-main">
-                <span className="cart-item-title">
-                  Pedido #{order.id}
-                </span>
-                <span className="cart-item-meta">
-                  {new Date(order.createdAt).toLocaleString()} ·{" "}
-                  {order.items.length} productos
-                </span>
+          {orders.map((order) => {
+            const piezas = order.items.reduce(
+              (acc, it) => acc + it.qtyA + it.qtyB + it.qtyC,
+              0
+            );
+            return (
+              <div className="order-item" key={order.id}>
+                <div className="cart-item-main">
+                  <span className="cart-item-title">
+                    Pedido #{order.id}
+                  </span>
+                  <span className="cart-item-meta">
+                    {new Date(order.createdAt).toLocaleString()} ·{" "}
+                    {order.items.length} productos · {piezas} piezas
+                  </span>
+                </div>
+                <div className="cart-qty">
+                  <span>{labelEstadoPedido(order.status)}</span>
+                </div>
               </div>
-              <div className="cart-qty">
-                <span>{order.status}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </section>
@@ -674,7 +900,6 @@ export default function ClientePage() {
 
   return (
     <div className="cliente-container">
-      {/* Tabs superiores (internas del cliente) */}
       <div className="cliente-tabs">
         <button
           type="button"
@@ -699,7 +924,6 @@ export default function ClientePage() {
         </button>
       </div>
 
-      {/* Contenido de cada tab */}
       {activeTab === "catalog" && renderCatalogView()}
       {activeTab === "cart" && renderCartView()}
       {activeTab === "orders" && renderOrdersView()}
