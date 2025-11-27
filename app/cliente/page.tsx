@@ -104,14 +104,35 @@ function estadoPedidoLabel(e: EstadoPedidoApi): string {
   }
 }
 
+/* ================== Detección de dispositivo ================== */
+
+function getDeviceType(): "PC" | "Tablet" | "Celular" {
+  if (typeof navigator === "undefined") return "PC";
+
+  const ua = navigator.userAgent.toLowerCase();
+
+  const isTablet =
+    /ipad|tablet|sm-t|tab|kindle/.test(ua) ||
+    (window.innerWidth >= 600 && window.innerWidth <= 1024);
+
+  const isMobile =
+    /iphone|ipod|android.+mobile|mobile/.test(ua) || window.innerWidth < 600;
+
+  if (isTablet) return "Tablet";
+  if (isMobile) return "Celular";
+  return "PC";
+}
+
 /* ================== Tarjeta de producto ================== */
 
 function ProductCard({
   product,
   onAdd,
+  onOpenLightbox,
 }: {
   product: Product;
   onAdd: (p: Product) => void;
+  onOpenLightbox?: (p: Product) => void;
 }) {
   const [favorite, setFavorite] = useState(false);
 
@@ -148,7 +169,11 @@ function ProductCard({
     <div className="card">
       {/* Bloque superior (imagen + SKU) */}
       <div className="media-block">
-        <div className="img-wrap">
+        <button
+          type="button"
+          className="img-wrap"
+          onClick={() => onOpenLightbox?.(product)}
+        >
           <Image
             src={mainImg}
             alt={product.desc || product.sku}
@@ -158,7 +183,7 @@ function ProductCard({
           {hasFotosExtra && (
             <span className="photos-chip">{product.imgs.length} fotos</span>
           )}
-        </div>
+        </button>
 
         <div className="sku-center">
           <span className="sku">{product.sku}</span>
@@ -229,6 +254,15 @@ export default function ClientePage() {
   const [sendOrderError, setSendOrderError] = useState<string | null>(null);
   const [sendOrderOk, setSendOrderOk] = useState<string | null>(null);
 
+  // Modal de confirmación de envío
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  // Lightbox multi-imagen
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState<string[]>([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxTitle, setLightboxTitle] = useState<string>("");
+
   // Si no hay cliente aún, por defecto 3 sucursales (modo demo seguro)
   const sucursalesActivas: 1 | 2 | 3 =
     (cliente?.sucursales as 1 | 2 | 3) ?? 3;
@@ -269,7 +303,7 @@ export default function ClientePage() {
     load();
   }, []);
 
-  /* ==== Cargar cliente actual (demo: primer cliente activo) ==== */
+  /* ==== Cargar cliente actual ==== */
 
   useEffect(() => {
     const loadClienteActual = async () => {
@@ -463,6 +497,39 @@ export default function ClientePage() {
     [cart]
   );
 
+  /* ==== Lightbox helpers ==== */
+
+  const openLightbox = (product: Product) => {
+    if (!product.imgs || product.imgs.length === 0) return;
+    setLightboxImages(product.imgs);
+    setLightboxIndex(0);
+    setLightboxTitle(`${product.sku} · ${product.brand}`);
+    setLightboxOpen(true);
+  };
+
+  const closeLightbox = () => {
+    setLightboxOpen(false);
+    setLightboxImages([]);
+    setLightboxIndex(0);
+    setLightboxTitle("");
+  };
+
+  const handleLightboxPrev = () => {
+    setLightboxIndex((prev) =>
+      lightboxImages.length === 0
+        ? 0
+        : (prev - 1 + lightboxImages.length) % lightboxImages.length
+    );
+  };
+
+  const handleLightboxNext = () => {
+    setLightboxIndex((prev) =>
+      lightboxImages.length === 0
+        ? 0
+        : (prev + 1) % lightboxImages.length
+    );
+  };
+
   /* ==== Enviar pedido real a /api/pedidos/create ==== */
 
   const handleSendOrder = async () => {
@@ -472,6 +539,8 @@ export default function ClientePage() {
       setSendingOrder(true);
       setSendOrderError(null);
       setSendOrderOk(null);
+
+      const dispositivoDetectado = getDeviceType();
 
       // Ajustar cantidades según sucursales activas
       const sanitized = cart.map((item) => ({
@@ -520,7 +589,7 @@ export default function ClientePage() {
       const body = {
         clienteId: cliente?.id ?? undefined,
         comentario: null,
-        dispositivo: "cliente-web",
+        dispositivo: dispositivoDetectado,
         items: itemsBody,
       };
 
@@ -539,6 +608,7 @@ export default function ClientePage() {
       setCart([]);
       setSendOrderOk("Pedido enviado correctamente.");
       setActiveTab("orders");
+      setShowConfirmModal(false);
 
       if (cliente?.id) {
         await loadPedidosCliente(cliente.id);
@@ -609,7 +679,12 @@ export default function ClientePage() {
       <div data-kolben>
         <div className="grid">
           {filteredProducts.map((p) => (
-            <ProductCard key={p.id} product={p} onAdd={handleAddToCart} />
+            <ProductCard
+              key={p.id}
+              product={p}
+              onAdd={handleAddToCart}
+              onOpenLightbox={openLightbox}
+            />
           ))}
         </div>
       </div>
@@ -646,6 +721,11 @@ export default function ClientePage() {
           </>
         )}
       </div>
+
+      {/* Mensaje de tranquilidad del carrito */}
+      <p className="cart-hint">
+        Agrega tus productos con calma, tu carrito los guardará automáticamente.
+      </p>
 
       {cart.length === 0 ? (
         <div style={{ padding: "12px 0" }}>
@@ -806,7 +886,7 @@ export default function ClientePage() {
             <button
               type="button"
               className="btn"
-              onClick={handleSendOrder}
+              onClick={() => setShowConfirmModal(true)}
               disabled={sendingOrder}
             >
               {sendingOrder ? "Enviando pedido..." : "Enviar pedido"}
@@ -911,6 +991,89 @@ export default function ClientePage() {
       {activeTab === "catalog" && renderCatalogView()}
       {activeTab === "cart" && renderCartView()}
       {activeTab === "orders" && renderOrdersView()}
+
+      {/* Modal de confirmación de envío */}
+      {showConfirmModal && (
+        <div className="modal-backdrop">
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Confirmar envío</h2>
+            <p>
+              ¿Quieres enviar tu pedido ahora o volver al carrito para
+              revisar las cantidades?
+            </p>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="btn light"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={sendingOrder}
+              >
+                Volver al carrito
+              </button>
+              <button
+                type="button"
+                className="btn"
+                onClick={handleSendOrder}
+                disabled={sendingOrder}
+              >
+                {sendingOrder ? "Enviando..." : "Confirmar envío"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lightbox multi-imagen */}
+      {lightboxOpen && (
+        <div
+          className="lightbox-backdrop"
+          onClick={() => closeLightbox()}
+        >
+          <div className="lightbox" onClick={(e) => e.stopPropagation()}>
+            <div className="lightbox-title">{lightboxTitle}</div>
+
+            <div className="lightbox-img-wrapper">
+              {lightboxImages[lightboxIndex] && (
+                <img
+                  src={lightboxImages[lightboxIndex]}
+                  alt={lightboxTitle}
+                  className="lightbox-img"
+                />
+              )}
+            </div>
+
+            {lightboxImages.length > 1 && (
+              <div className="lightbox-arrows">
+                <button
+                  type="button"
+                  className="lightbox-arrow"
+                  onClick={handleLightboxPrev}
+                >
+                  ‹
+                </button>
+                <span className="lightbox-counter">
+                  {lightboxIndex + 1} / {lightboxImages.length}
+                </span>
+                <button
+                  type="button"
+                  className="lightbox-arrow"
+                  onClick={handleLightboxNext}
+                >
+                  ›
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              className="lightbox-close"
+              onClick={closeLightbox}
+            >
+              ✕ Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

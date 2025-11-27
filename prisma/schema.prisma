@@ -9,21 +9,22 @@ datasource db {
 
 /// Clientes que verán /cliente y tendrán usuario/clave
 model Cliente {
-  id        Int      @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   nombre    String
-  codigo    String   @unique
-  activo    Boolean  @default(true)
+  codigo    String  @unique
+  activo    Boolean @default(true)
   claveHash String
 
   sucursales Int @default(1)
-  
+
   createdAt DateTime @default(now())
   email     String?  @unique
   sucursalA Boolean  @default(true)
   sucursalB Boolean  @default(false)
   sucursalC Boolean  @default(false)
   updatedAt DateTime @default(now()) @updatedAt
-  pedidos   Pedido[]
+
+  pedidos Pedido[]
 }
 
 /// Productos Kolben
@@ -34,28 +35,36 @@ model Producto {
   descripcion String
   tipo        TipoProducto
   estado      EstadoProducto @default(DISPONIBLE)
+
   /// ETA texto para "Reservar (en camino)", ej. "15/12/2025"
-  eta         String?
+  eta String?
+
   /// Precio de referencia (puede ser null si no queremos guardarlo aquí)
-  precio      Float?
+  precio Float?
+
   /// URLs de imágenes almacenadas como JSON (array de strings)
-  imagenes    Json?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @default(now()) @updatedAt
-  items       PedidoItem[]
+  imagenes Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  items PedidoItem[]
 }
 
 /// Pedido de un cliente (carrito enviado)
 model Pedido {
-  id                Int          @id @default(autoincrement())
-  clienteId         Int
-  comentario        String?
-  createdAt         DateTime     @default(now())
-  dispositivoOrigen String?
-  updatedAt         DateTime     @default(now()) @updatedAt
-  estado            EstadoPedido @default(PENDIENTE)
-  cliente           Cliente      @relation(fields: [clienteId], references: [id])
-  items             PedidoItem[]
+  id         Int          @id @default(autoincrement())
+  clienteId  Int
+  comentario String?
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @default(now()) @updatedAt
+  estado     EstadoPedido @default(PENDIENTE)
+
+  /// Tipo de dispositivo desde el que se hizo el pedido (PC / Tablet / Celular)
+  dispositivo String?
+
+  cliente Cliente      @relation(fields: [clienteId], references: [id])
+  items   PedidoItem[]
 }
 
 /// Línea individual de un pedido
@@ -70,8 +79,9 @@ model PedidoItem {
   etaTexto    String?
   productoId  Int
   tipo        TipoLinea @default(NORMAL)
-  pedido      Pedido    @relation(fields: [pedidoId], references: [id])
-  producto    Producto  @relation(fields: [productoId], references: [id])
+
+  pedido   Pedido   @relation(fields: [pedidoId], references: [id])
+  producto Producto @relation(fields: [productoId], references: [id])
 }
 
 /// Estado de disponibilidad del producto en catálogo

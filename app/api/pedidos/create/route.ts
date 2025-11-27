@@ -1,135 +1,156 @@
 // app/api/pedidos/create/route.ts
-import { prisma } from "@/lib/prisma";
+import { NextResponse } from "next/server";
+import prisma from "@/lib/prisma";
 
-type CreatePedidoItem = {
+/* ============================================================
+   Tipos esperados desde el cliente
+   ============================================================ */
+type ItemBody = {
   sku: string;
-  cantidadA?: number;
-  cantidadB?: number;
-  cantidadC?: number;
-  tipo?: "NORMAL" | "RESERVA";
-  estadoTexto?: string | null;
-  etaTexto?: string | null;
+  cantidadA: number;
+  cantidadB: number;
+  cantidadC: number;
+  tipo: "NORMAL" | "RESERVA";
+  estadoTexto: string | null;
+  etaTexto: string | null;
 };
 
-type CreatePedidoBody = {
-  clienteId?: number | string;
-  comentario?: string;
-  dispositivo?: string;
-  items: CreatePedidoItem[];
+type PedidoCreateBody = {
+  clienteId?: number;
+  comentario?: string | null;
+  dispositivo?: string; // PC / Tablet / Celular (opcional)
+  items: ItemBody[];
 };
 
+/* ============================================================
+   POST /api/pedidos/create
+   ============================================================ */
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as CreatePedidoBody;
+    const body = (await req.json()) as PedidoCreateBody;
 
-    // 1) Validar que hay items
-    if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
-      return Response.json(
-        { ok: false, error: "El pedido no tiene productos." },
+    const { clienteId, comentario, dispositivo, items } = body;
+
+    /* -----------------------------
+       Validaciones básicas
+    ------------------------------ */
+
+    if (!items || !Array.isArray(items) || items.length === 0) {
+      return NextResponse.json(
+        { ok: false, error: "No hay items en el pedido." },
         { status: 400 }
       );
     }
 
-    // 2) Resolver clienteId (usa el enviado o el primer cliente activo)
-    let clienteIdFinal: number | null = null;
-
-    if (body.clienteId != null) {
-      const parsed = Number(body.clienteId);
-      if (!Number.isNaN(parsed) && parsed > 0) {
-        clienteIdFinal = parsed;
-      }
+    if (!clienteId) {
+      return NextResponse.json(
+        { ok: false, error: "Falta clienteId." },
+        { status: 400 }
+      );
     }
 
-    if (!clienteIdFinal) {
-      const clienteActivo = await prisma.cliente.findFirst({
-        where: { activo: true },
-        orderBy: { id: "asc" },
-      });
-
-      if (!clienteActivo) {
-        return Response.json(
-          {
-            ok: false,
-            error: "No hay cliente activo para asociar el pedido.",
-          },
+    // Validar cantidades no negativas
+    for (const it of items) {
+      if (
+        it.cantidadA < 0 ||
+        it.cantidadB < 0 ||
+        it.cantidadC < 0
+      ) {
+        return NextResponse.json(
+          { ok: false, error: "Las cantidades no pueden ser negativas." },
           { status: 400 }
         );
       }
-
-      clienteIdFinal = clienteActivo.id;
     }
 
-    // 3) Resolver productos por SKU (una sola consulta)
-    const skus = Array.from(
-      new Set(
-        body.items
-          .map((it) => String(it.sku ?? "").trim())
-          .filter((s) => s.length > 0)
-      )
+    // Opcional: filtrar líneas con todas las cantidades en 0
+    const itemsConCantidad = items.filter(
+      (i) =>
+        (i.cantidadA ?? 0) > 0 ||
+        (i.cantidadB ?? 0) > 0 ||
+        (i.cantidadC ?? 0) > 0
     );
 
-    if (skus.length === 0) {
-      return Response.json(
-        { ok: false, error: "Los items del pedido no tienen SKU válido." },
+    if (itemsConCantidad.length === 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: "No hay cantidades válidas (>0) en el pedido.",
+        },
         { status: 400 }
       );
     }
 
+    /* -----------------------------------------------------------
+       Resolver productos por SKU
+       ----------------------------------------------------------- */
+
+    const uniqueSkus = Array.from(
+      new Set(itemsConCantidad.map((i) => i.sku))
+    );
+
     const productos = await prisma.producto.findMany({
-      where: { sku: { in: skus } },
+      where: { sku: { in: uniqueSkus } },
     });
 
-    const skuToId = new Map(productos.map((p) => [p.sku, p.id]));
-
-    // Verificar que todos los SKUs realmente existen
-    for (const it of body.items) {
-      const key = String(it.sku ?? "").trim();
-      if (!skuToId.has(key)) {
-        return Response.json(
-          {
-            ok: false,
-            error: `Producto con SKU "${key}" no existe en la base de datos.`,
-          },
-          { status: 400 }
-        );
-      }
+    const mapSkuToProducto = new Map<string, number>();
+    for (const p of productos) {
+      mapSkuToProducto.set(p.sku, p.id);
     }
 
-    // 4) Crear pedido + líneas
+    // Verificar que todos los SKUs existan
+    const skusNoEncontrados = uniqueSkus.filter(
+      (sku) => !mapSkuToProducto.has(sku)
+    );
+
+    if (skusNoEncontrados.length > 0) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error:
+            "Hay SKUs que no existen en catálogo: " +
+            skusNoEncontrados.join(", "),
+        },
+        { status: 400 }
+      );
+    }
+
+    /* -----------------------------------------------------------
+       Crear pedido en BD
+       ----------------------------------------------------------- */
+
     const pedido = await prisma.pedido.create({
       data: {
-        clienteId: clienteIdFinal,
-        comentario: body.comentario ?? null,
-        dispositivoOrigen: body.dispositivo ?? null,
+        cliente: { connect: { id: clienteId } },
+        comentario: comentario ?? null,
         estado: "PENDIENTE",
+
+        // Campo nuevo en schema.prisma
+        dispositivo: dispositivo ?? null,
+
         items: {
-          create: body.items.map((it) => {
-            const key = String(it.sku ?? "").trim();
-            return {
-              productoId: skuToId.get(key)!,
-              cantidadA: it.cantidadA ?? 0,
-              cantidadB: it.cantidadB ?? 0,
-              cantidadC: it.cantidadC ?? 0,
-              tipo: it.tipo === "RESERVA" ? "RESERVA" : "NORMAL",
-              estadoTexto: it.estadoTexto ?? null,
-              etaTexto: it.etaTexto ?? null,
-            };
-          }),
+          create: itemsConCantidad.map((i) => ({
+            productoId: mapSkuToProducto.get(i.sku)!,
+            cantidadA: i.cantidadA,
+            cantidadB: i.cantidadB,
+            cantidadC: i.cantidadC,
+            tipo: i.tipo,
+            estadoTexto: i.estadoTexto,
+            etaTexto: i.etaTexto,
+          })),
         },
       },
       include: {
         cliente: true,
-        items: {
-          include: { producto: true },
-        },
+        items: true,
       },
     });
 
-    return Response.json({ ok: true, data: pedido });
+    return NextResponse.json({ ok: true, pedido });
   } catch (err) {
     console.error("Error creando pedido:", err);
-    return Response.json(
-      { ok: false, error: "Error creando pedido" },
+    return NextResponse.json(
+      { ok: false, error: "Error interno del servidor" },
       { status: 500 }
     );
   }
