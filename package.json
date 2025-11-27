@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "seed:productos": "node scripts/seed-productos.cjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",
