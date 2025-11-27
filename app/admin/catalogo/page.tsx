@@ -1,19 +1,13 @@
-// app/admin/catalogo/page.tsx
 "use client";
 
-import { useEffect, useState } from "react";
-import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import "../admin.css";
-import "../productos/productos.css";
 
-/**
- * Tipos de producto y estados exactamente como los que devuelve
- * /api/productos/list
- */
+/* ========= Tipos alineados con /api/productos/list ========= */
+
 type ProductStatus = "disponible" | "bajo" | "agotado" | "reserva";
 
-type TipoProducto =
-  | "todo"
+type ProductType =
   | "maestro_frenos"
   | "maestro_clutch"
   | "auxiliar_frenos"
@@ -21,50 +15,85 @@ type TipoProducto =
   | "pastillas_freno";
 
 type Product = {
-  id: string;
+  id: number;
   sku: string;
   brand: string;
   desc: string;
   status: ProductStatus;
-  eta?: string;
-  type: TipoProducto;
+  type: ProductType;
   imgs: string[];
+  eta?: string;
 };
 
-type ApiResponse = {
-  ok: boolean;
-  data?: Product[];
-  error?: string;
+type StatusFilter = "todos" | ProductStatus;
+type TypeFilter = "todos" | ProductType;
+
+/* ========= Labels y helpers ========= */
+
+const STATUS_LABEL: Record<ProductStatus, string> = {
+  disponible: "Disponible",
+  bajo: "Bajo stock",
+  agotado: "Agotado",
+  reserva: "Reservar (en camino)",
 };
 
-export default function CatalogoAdminPage() {
+const TYPE_LABEL: Record<ProductType, string> = {
+  maestro_frenos: "Maestro de frenos",
+  maestro_clutch: "Maestro de clutch",
+  auxiliar_frenos: "Auxiliar de frenos",
+  auxiliar_clutch: "Auxiliar de clutch",
+  pastillas_freno: "Pastillas de freno",
+};
+
+function getStatusClass(status: ProductStatus) {
+  switch (status) {
+    case "disponible":
+      return "pill pill-disponible";
+    case "bajo":
+      return "pill pill-bajo";
+    case "agotado":
+      return "pill pill-agotado";
+    case "reserva":
+      return "pill pill-reserva";
+    default:
+      return "pill";
+  }
+}
+
+/* ========= Página principal ========= */
+
+export default function AdminCatalogoPage() {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("todos");
+  const [typeFilter, setTypeFilter] = useState<TypeFilter>("todos");
 
   useEffect(() => {
     let cancelled = false;
 
     async function load() {
       try {
+        setLoading(true);
+        setError(null);
+
         const res = await fetch("/api/productos/list");
         if (!res.ok) {
-          throw new Error(`Error HTTP ${res.status}`);
+          throw new Error("Error HTTP " + res.status);
         }
 
-        const json = (await res.json()) as ApiResponse;
+        const json = await res.json();
+        const data = (json?.data ?? []) as Product[];
 
-        if (!json.ok) {
-          throw new Error(json.error || "Error cargando productos");
-        }
-
-        if (!cancelled && json.data) {
-          setProducts(json.data);
-        }
-      } catch (err: any) {
-        console.error("Error cargando catálogo admin:", err);
         if (!cancelled) {
-          setError(err?.message ?? "Error cargando productos");
+          setProducts(data);
+        }
+      } catch (err) {
+        console.error("Error cargando productos en admin/catalogo:", err);
+        if (!cancelled) {
+          setError("No se pudieron cargar los productos.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -77,151 +106,149 @@ export default function CatalogoAdminPage() {
     };
   }, []);
 
+  const filtered = useMemo(() => {
+    return products.filter((p) => {
+      const q = search.trim().toLowerCase();
+
+      const matchesSearch =
+        !q ||
+        p.sku.toLowerCase().includes(q) ||
+        p.brand.toLowerCase().includes(q) ||
+        p.desc.toLowerCase().includes(q) ||
+        TYPE_LABEL[p.type].toLowerCase().includes(q);
+
+      const matchesStatus =
+        statusFilter === "todos" ? true : p.status === statusFilter;
+
+      const matchesType =
+        typeFilter === "todos" ? true : p.type === typeFilter;
+
+      return matchesSearch && matchesStatus && matchesType;
+    });
+  }, [products, search, statusFilter, typeFilter]);
+
   return (
     <main className="container">
-      <h1 style={{ marginBottom: 16 }}>Catálogo (admin)</h1>
+      <section className="panel">
+        {/* Encabezado */}
+        <div className="catalog-admin-header">
+          <div>
+            <h1 className="catalog-admin-title">Catálogo</h1>
+            <p className="catalog-admin-subtitle">
+              Visor de productos Kolben cargados en la base de datos Neon.
+            </p>
+          </div>
 
-      {loading && <p>Cargando productos…</p>}
-
-      {error && !loading && (
-        <div
-          style={{
-            marginTop: 12,
-            marginBottom: 12,
-            padding: 12,
-            borderRadius: 8,
-            background: "#fef2f2",
-            border: "1px solid #fecaca",
-            color: "#b91c1c",
-            fontSize: 14,
-          }}
-        >
-          {error}
+          <div className="catalog-admin-meta">
+            <span className="badge-count">
+              {filtered.length} producto
+              {filtered.length === 1 ? "" : "s"}
+            </span>
+          </div>
         </div>
-      )}
 
-      {!loading && !error && (
-        <div className="admin-table-container">
-          <table className="admin-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>SKU</th>
-                <th>Marca</th>
-                <th>Descripción</th>
-                <th>Tipo</th>
-                <th>Estado</th>
-                <th>Imágenes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {products.length === 0 && (
+        {/* Filtros */}
+        <div className="catalog-admin-filters">
+          <input
+            className="catalog-admin-input"
+            type="text"
+            placeholder="Buscar por código, marca o descripción…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+
+          <select
+            className="catalog-admin-select"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
+          >
+            <option value="todos">Todos los estados</option>
+            <option value="disponible">Disponible</option>
+            <option value="bajo">Bajo stock</option>
+            <option value="agotado">Agotado</option>
+            <option value="reserva">Reservar (en camino)</option>
+          </select>
+
+          <select
+            className="catalog-admin-select"
+            value={typeFilter}
+            onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}
+          >
+            <option value="todos">Todos los tipos</option>
+            <option value="maestro_frenos">Maestro de frenos</option>
+            <option value="maestro_clutch">Maestro de clutch</option>
+            <option value="auxiliar_frenos">Auxiliar de frenos</option>
+            <option value="auxiliar_clutch">Auxiliar de clutch</option>
+            <option value="pastillas_freno">Pastillas de freno</option>
+          </select>
+        </div>
+
+        {/* Contenido */}
+        {loading && <p>Cargando productos…</p>}
+
+        {!loading && error && (
+          <p style={{ color: "#b91c1c", fontSize: "0.9rem" }}>{error}</p>
+        )}
+
+        {!loading && !error && filtered.length === 0 && (
+          <p style={{ fontSize: "0.9rem", color: "#6b7280" }}>
+            No hay productos que coincidan con los filtros.
+          </p>
+        )}
+
+        {!loading && !error && filtered.length > 0 && (
+          <div className="admin-table-container">
+            <table className="admin-table">
+              <thead>
                 <tr>
-                  <td colSpan={7} style={{ textAlign: "center", padding: 16 }}>
-                    No hay productos aún.
-                  </td>
+                  <th>ID</th>
+                  <th>SKU</th>
+                  <th>Marca</th>
+                  <th>Descripción</th>
+                  <th>Tipo</th>
+                  <th>Estado</th>
+                  <th>Imágenes</th>
                 </tr>
-              )}
+              </thead>
 
-              {products.map((p) => (
-                <tr key={p.id}>
-                  <td>{p.id}</td>
-                  <td
-                    style={{
-                      fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco",
-                    }}
-                  >
-                    {p.sku}
-                  </td>
-                  <td>{p.brand}</td>
-                  <td>{p.desc}</td>
-                  <td>{labelTipo(p.type)}</td>
-                  <td>{labelEstado(p.status, p.eta)}</td>
-                  <td>
-                    {p.imgs && p.imgs.length > 0 ? (
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          gap: 8,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 64,
-                            height: 64,
-                            position: "relative",
-                            borderRadius: 8,
-                            overflow: "hidden",
-                            border: "1px solid #e5e7eb",
-                            background: "#f9fafb",
-                          }}
-                        >
-                          <Image
-                            src={p.imgs[0]}
-                            alt={p.desc || p.sku}
-                            fill
-                            style={{ objectFit: "contain" }}
-                          />
-                        </div>
-                        {p.imgs.length > 1 && (
-                          <span
-                            style={{
-                              fontSize: 12,
-                              color: "#6b7280",
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            +{p.imgs.length - 1} foto(s)
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <span style={{ fontSize: 12, color: "#9ca3af" }}>
-                        Sin imagen
+              <tbody>
+                {filtered.map((p) => (
+                  <tr key={p.id}>
+                    <td>{p.id}</td>
+                    <td>{p.sku}</td>
+                    <td>{p.brand}</td>
+                    <td>{p.desc}</td>
+                    <td>{TYPE_LABEL[p.type]}</td>
+                    <td>
+                      <span className={getStatusClass(p.status)}>
+                        {STATUS_LABEL[p.status]}
                       </span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+                    </td>
+                    <td>
+                      {p.imgs && p.imgs.length > 0 ? (
+                        <div className="catalog-thumb-wrapper">
+                          <img
+                            src={p.imgs[0]}
+                            alt={p.sku}
+                            className="catalog-thumb"
+                          />
+                          {p.imgs.length > 1 && (
+                            <span className="catalog-thumb-count">
+                              +{p.imgs.length - 1}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="catalog-no-image">Sin imagen</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
     </main>
   );
-}
-
-function labelTipo(tipo: TipoProducto): string {
-  switch (tipo) {
-    case "maestro_frenos":
-      return "Maestro de frenos";
-    case "maestro_clutch":
-      return "Maestro de clutch";
-    case "auxiliar_frenos":
-      return "Auxiliar de frenos";
-    case "auxiliar_clutch":
-      return "Auxiliar de clutch";
-    case "pastillas_freno":
-      return "Pastillas de freno";
-    default:
-      return "N/D";
-  }
-}
-
-function labelEstado(status: ProductStatus, eta?: string): string {
-  switch (status) {
-    case "disponible":
-      return "Disponible";
-    case "bajo":
-      return "Bajo stock";
-    case "agotado":
-      return "Agotado";
-    case "reserva":
-      return eta && eta.trim()
-        ? `En camino · ${eta.trim()}`
-        : "En camino";
-    default:
-      return "N/D";
-  }
 }
